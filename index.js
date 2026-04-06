@@ -5,7 +5,7 @@ const app = express();
 app.get('/', (req, res) => res.send('Bot is running!'));
 app.listen(process.env.PORT || 3000);
 
-const bot = new Telegraf('8679972956:AAHDat96XDZHoLNU2q3uzmCFp1SwOom7N78');
+const bot = new Telegraf('8615857616:AAHW4dhfrslhBG_48LMiXPsKQ0ojiO-YSfU');
 
 bot.start((ctx) => {
   ctx.reply('Добро пожаловать в MedPediatr! Чем я могу вам помочь?');

@@ -1,3 +1,8 @@
+const express = require('express');
+const app = express();
+app.get('/', (req, res) => res.send('Bot is running!'));
+app.listen(process.env.PORT || 3000);
+
 const { Telegraf } = require('telegraf');
 
 const bot = new Telegraf('8679972956:AAHDat96XDZHoLNU2q3uzmCFp1SwOom7N78');

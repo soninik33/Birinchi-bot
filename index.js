@@ -117,4 +117,4 @@ bot.on('text', (ctx) => {
 });
 
 bot.launch();
-console.log("Бот запушен!");
+console.log("Bot muvaffaqiyatli ishga tushdi!");

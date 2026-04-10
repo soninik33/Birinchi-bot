@@ -94,7 +94,7 @@ bot.on('text', async (ctx) => {
     if (text === 'да') {
         return ctx.reply('Выберите нужного специалиста для получения детальной информации:', doctorButtons);
     } else if (text === 'нет') {
-        return ctx.reply('Тогда иди нахуй');
+        return ctx.reply('Тогда Дасвидос');
     } else {
         await ctx.reply('Ваше сообщение получено, ожидайте ответа врача.');
         setTimeout(() => {

@@ -94,7 +94,7 @@ bot.on('text', async (ctx) => {
     if (text === 'да') {
         return ctx.reply('Выберите нужного специалиста для получения детальной информации:', doctorButtons);
     } else if (text === 'нет') {
-        return ctx.reply('Тогда Дасвидос');
+        return ctx.reply('Тогда иди нахуй');
     } else {
         await ctx.reply('Ваше сообщение получено, ожидайте ответа врача.');
         setTimeout(() => {
@@ -109,7 +109,7 @@ bot.action(/info_(.+)/, async (ctx) => {
     if (data) {
         await ctx.answerCbQuery();
         await ctx.editMessageText(data.text, {
-            parse_mode: 'HTML',
+            parse_mode: 'HTML', // Bold bo'lishi uchun HTML formatini yoqdik
             ...Markup.inlineKeyboard([
                 [Markup.button.url('Написать врачу лично 💬', data.link)],
                 [Markup.button.callback('⬅️ Вернуться к списку', 'back_to_list')]
@@ -124,4 +124,4 @@ bot.action('back_to_list', async (ctx) => {
 });
 
 bot.launch();
-console.log("Бот запушен, и слушает команды!");
+console.log("Bot muvaffaqiyatli yangilandi!");

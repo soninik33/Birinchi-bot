@@ -6,6 +6,10 @@ app.get('/', (req, res) => res.send('Bot is running!'));
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server port ${PORT} da ishlamoqda`));
 
+setInterval(() => {
+  console.log("Bot hali ham ishlamoqda...");
+}, 300000);
+
 const bot = new Telegraf('8679972956:AAEBHBBCBnbkIFbq9BCg7pBGnkQZWpmxI8c');
 
 const doctorData = {

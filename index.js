@@ -2,13 +2,10 @@ const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
 const app = express();
 
-app.get('/', (req, res) => res.send('Bot is running!'));
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server port ${PORT} da ishlamoqda`));
-
-setInterval(() => {
-  console.log("Bot hali ham ishlamoqda...");
-}, 300000);
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => { 
+    console.log(`Server port ${PORT} da ishlamoqda`);
+});
 
 const bot = new Telegraf('8679972956:AAEBHBBCBnbkIFbq9BCg7pBGnkQZWpmxI8c');
 

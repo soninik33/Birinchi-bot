@@ -4,6 +4,8 @@ const express = require('express');
 const { DatabaseSync } = require('node:sqlite');
 const { Telegraf, Markup, session } = require('telegraf');
 
+loadEnvFile(path.join(__dirname, '.env'));
+
 const PORT = Number(process.env.PORT) || 10000;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID ? Number(process.env.ADMIN_CHAT_ID) : null;
@@ -12,6 +14,40 @@ const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'data', 
 if (!BOT_TOKEN) {
   console.error('TELEGRAM_BOT_TOKEN topilmadi. Botni ishga tushirishdan oldin env ornatilsin.');
   process.exit(1);
+}
+
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return;
+  }
+
+  const content = fs.readFileSync(filePath, 'utf8');
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf('=');
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex).trim();
+    if (!key || process.env[key] !== undefined) {
+      continue;
+    }
+
+    let value = line.slice(separatorIndex + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[key] = value;
+  }
 }
 
 const dataDir = path.dirname(DATABASE_PATH);
@@ -141,14 +177,22 @@ function backfillTicketCodes() {
     WHERE ticket_code IS NULL OR ticket_code = ''
   `).all();
 
+  if (!rows.length) {
+    return;
+  }
+
   const updateStmt = db.prepare('UPDATE complaints SET ticket_code = ?, updated_at = COALESCE(updated_at, created_at) WHERE id = ?');
-  const txn = db.transaction((records) => {
-    for (const row of records) {
+
+  db.exec('BEGIN');
+  try {
+    for (const row of rows) {
       updateStmt.run(ensureTicketCodeUnique(), row.id);
     }
-  });
-
-  txn(rows);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
 }
 
 function actorNameFromCtx(ctx) {
@@ -200,8 +244,13 @@ function migrateLegacyJsonl() {
     })
     .filter(Boolean);
 
-  const insertMany = db.transaction((records) => {
-    for (const record of records) {
+  if (!rows.length) {
+    return;
+  }
+
+  db.exec('BEGIN');
+  try {
+    for (const record of rows) {
       const ticketCode = record.ticketCode || ensureTicketCodeUnique();
       insertComplaintStmt.run(
         record.id,
@@ -220,9 +269,11 @@ function migrateLegacyJsonl() {
         record.adminNotes || null
       );
     }
-  });
-
-  insertMany(rows);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
 }
 
 migrateLegacyJsonl();

@@ -2,12 +2,12 @@ const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
 const app = express();
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server port ${PORT} da ishlamoqda`);
 });
 
-const bot = new Telegraf('8679972956:AAEBHBBCBnbkIFbq9BCg7pBGnkQZWpmxI8c');
+const bot = new Telegraf('8679972956:AAGYXhdlzh84_EzOc-1iVoY5HgmiGHPZj5Y');
 
 const doctorData = {
     malika: {
@@ -100,7 +100,7 @@ bot.on('text', async (ctx) => {
         await ctx.reply('Ваше сообщение получено, ожидайте ответа врача.');
         setTimeout(() => {
             ctx.reply('Вы хотите связаться с врачом?');
-        }, 10000);
+        }, 5000);
     }
 });
 

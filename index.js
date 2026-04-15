@@ -9,12 +9,7 @@ loadEnvFile(path.join(__dirname, '.env'));
 const PORT = Number(process.env.PORT) || 10000;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID ? Number(process.env.ADMIN_CHAT_ID) : null;
-const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'data', 'medbot.sqlite');
-
-if (!BOT_TOKEN) {
-  console.error('TELEGRAM_BOT_TOKEN topilmadi. Botni ishga tushirishdan oldin env ornatilsin.');
-  process.exit(1);
-}
+const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'data', 'medbot.sqlite');s
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) {

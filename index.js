@@ -1,10 +1,56 @@
 const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 1000;
 const BOT_TOKEN = process.env.BOT_TOKEN || '8679972956:AAGYXhdlzh84_EzOc-1iVoY5HgmiGHPZj5Y';
-const SUPPORT_CHAT_ID = process.env.SUPPORT_CHAT_ID ? Number(process.env.SUPPORT_CHAT_ID) : null;
+const CONFIG_PATH = path.join(__dirname, 'bot-config.json');
+
+function loadConfig() {
+  try {
+    if (!fs.existsSync(CONFIG_PATH)) {
+      return {};
+    }
+
+    return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+  } catch (error) {
+    console.error("Config o'qishda xato:", error.message);
+    return {};
+  }
+}
+
+function saveConfig(configData) {
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(configData, null, 2));
+  } catch (error) {
+    console.error('Config yozishda xato:', error.message);
+  }
+}
+
+const config = loadConfig();
+let supportChatId = process.env.SUPPORT_CHAT_ID
+  ? Number(process.env.SUPPORT_CHAT_ID)
+  : config.supportChatId || null;
+let ownerUserId = process.env.OWNER_USER_ID
+  ? Number(process.env.OWNER_USER_ID)
+  : config.ownerUserId || null;
+
+function isOwner(ctx) {
+  return Boolean(ownerUserId && ctx.from && ctx.from.id === ownerUserId);
+}
+
+function ensureOwner(ctx) {
+  if (!ownerUserId && ctx.from) {
+    ownerUserId = ctx.from.id;
+    config.ownerUserId = ownerUserId;
+    saveConfig(config);
+    return true;
+  }
+
+  return isOwner(ctx);
+}
 
 app.get('/', (req, res) => res.send('Bot is running!'));
 app.listen(PORT, '0.0.0.0', () => console.log(`Server port ${PORT} da ishlamoqda`));
@@ -33,8 +79,11 @@ const TEXT = {
     chatClosed: 'Mutaxassis bilan suhbat yakunlandi.',
     sentToSpecialist: (name) => `Xabaringiz ${name} ga yuborildi. Javob shu bot ichida keladi.`,
     supportUnavailable:
-      "Hozircha operator chat ulanmagan. SUPPORT_CHAT_ID ni sozlaganingizdan keyin xabarlar mutaxassisga yuboriladi.",
+      "Hozircha operator chat ulanmagan. Operator chatda /setchatid yuboring, shundan keyin xabarlar mutaxassisga yuboriladi.",
     specialistReplyPrefix: (name) => `${name} javobi:`,
+    ownerOnly:
+      "Bu buyruq faqat bot egasi uchun. Agar bu bot birinchi marta sozlanayotgan bo'lsa, avval /setchatid yuboring.",
+    ownerSaved: (userId) => `Admin saqlandi. Owner ID: ${userId}`,
   },
   ru: {
     welcome: 'Добро пожаловать в MedPediatr! Выберите язык:',
@@ -50,74 +99,77 @@ const TEXT = {
     chatClosed: 'Чат со специалистом завершен.',
     sentToSpecialist: (name) => `Ваше сообщение отправлено специалисту ${name}. Ответ придет в этом же боте.`,
     supportUnavailable:
-      'Чат для операторов пока не подключен. После настройки SUPPORT_CHAT_ID сообщения будут уходить специалисту.',
+      'Чат для операторов пока не подключен. Отправьте /setchatid в операторском чате, и после этого сообщения будут уходить специалисту.',
     specialistReplyPrefix: (name) => `Ответ специалиста ${name}:`,
+    ownerOnly:
+      'Эта команда доступна только владельцу бота. Если бот настраивается впервые, сначала отправьте /setchatid.',
+    ownerSaved: (userId) => `Владелец сохранен. Owner ID: ${userId}`,
   },
 };
 
 const doctorData = {
   uz: {
     malika: {
-      name: 'Malika Alisherovna',
+      name: '🧠 Malika Alisherovna',
       text:
-        "<b>Malika Alisherovna - Bolalar nevrologi (oliy toifali)</b>\n\n<b>Tajriba:</b> 25 yildan ortiq.\n<b>Yo'nalishlari:</b>\n• nutq rivojlanishi kechikishi;\n• tug'ruq paytidagi gipoksiya oqibatlari;\n• DEGS bo'yicha kompleks yondashuv;\n• BSF va ASB reabilitatsiyasi;\n• surunkali bosh og'riqlari va uyqu buzilishlari.",
+        "<b>🧠 Malika Alisherovna - Bolalar nevrologi (oliy toifali)</b>\n\n<b>Tajriba:</b> 25 yildan ortiq.\n<b>Qabul yo'nalishlari:</b>\n• nutq rivojlanishi kechikishi;\n• tug'ruq paytidagi gipoksiya oqibatlari;\n• DEGS va diqqat jamlash muammolari;\n• BSF va ASB bo'yicha reabilitatsiya;\n• surunkali bosh og'riqlari;\n• uyqu buzilishlari va bezovtalik.\n\n<b>Qabulga qachon murojaat qilish kerak:</b>\n• bola kech gapirsa;\n• tez charchasa yoki serjahllik kuzatilsa;\n• hushyorlik va diqqat bilan muammo bo'lsa.\n\n<b>Qabul formati:</b> ko'rik, tavsiya va keyingi nazorat rejasi.",
     },
     anvar: {
-      name: 'Anvar Xakimov',
+      name: '⚡ Anvar Xakimov',
       text:
-        "<b>Anvar Xakimov - Nevrolog-epileptolog</b>\n\n<b>Tajriba:</b> 15 yil.\n<b>Yo'nalishlari:</b>\n• EEG monitoring va tahlil;\n• tungi uyqu buzilishlari;\n• tiklar va duduqlanish;\n• bosh miya jarohatlaridan keyingi tiklanish.",
+        "<b>⚡ Anvar Xakimov - Nevrolog-epileptolog</b>\n\n<b>Tajriba:</b> 15 yil.\n<b>Qabul yo'nalishlari:</b>\n• EEG monitoring va tahlil;\n• hushdan ketish holatlari;\n• tiklar va duduqlanish;\n• tungi uyqu buzilishlari;\n• bosh miya jarohatlaridan keyingi tiklanish.\n\n<b>Mutaxassisligi:</b> tutqanoq holatlari va nevrologik kuzatuv.\n\n<b>Qabulga qachon kelish kerak:</b>\n• bola sababsiz qotib qolsa;\n• uyquda titrash yoki bezovtalik bo'lsa;\n• tez-tez bosh aylanishi kuzatilsa.",
     },
     lola: {
-      name: 'Lola Kirimova',
+      name: '👂 Lola Kirimova',
       text:
-        "<b>Lola Kirimova - LOR-shifokor</b>\n\n<b>Tajriba:</b> 18 yil.\n<b>Yo'nalishlari:</b>\n• adenoidit;\n• surunkali tonzillit;\n• otit;\n• sinusit va allergik rinit.",
+        "<b>👂 Lola Kirimova - LOR-shifokor</b>\n\n<b>Tajriba:</b> 18 yil.\n<b>Qabul yo'nalishlari:</b>\n• adenoidit;\n• surunkali tonzillit;\n• otit;\n• sinusit;\n• allergik rinit;\n• burun bitishi va quloq og'rig'i.\n\n<b>Ko'p uchraydigan shikoyatlar:</b>\n• bola og'iz ochib uxlaydi;\n• tez-tez shamollaydi;\n• eshitishi pasaygandek tuyuladi.",
     },
     sanjar: {
-      name: 'Sanjar Yusupov',
+      name: '👁 Sanjar Yusupov',
       text:
-        "<b>Sanjar Yusupov - Bolalar oftalmologi</b>\n\n<b>Tajriba:</b> 14 yil.\n<b>Yo'nalishlari:</b>\n• miopiya;\n• g'ilaylik;\n• ambliopiya;\n• tungi linzalar va ko'rish diagnostikasi.",
+        "<b>👁 Sanjar Yusupov - Bolalar oftalmologi</b>\n\n<b>Tajriba:</b> 14 yil.\n<b>Qabul yo'nalishlari:</b>\n• miopiya;\n• g'ilaylik;\n• ambliopiya;\n• ko'rish diagnostikasi;\n• tungi linzalar bo'yicha maslahat;\n• ekran bilan bog'liq ko'z charchoqlari.\n\n<b>Qabulga sabab bo'ladigan holatlar:</b>\n• televizorga juda yaqin borish;\n• ko'zni qisib qarash;\n• darsda yozuvni yomon ko'rish.",
     },
     nargiza: {
-      name: 'Nargiza Saidova',
+      name: '🥗 Nargiza Saidova',
       text:
-        "<b>Nargiza Saidova - Pediatr-dietolog</b>\n\n<b>Tajriba:</b> 12 yil.\n<b>Yo'nalishlari:</b>\n• oziq-ovqat allergiyalari;\n• vazn nazorati;\n• OIT muammolari;\n• ovqatlanish rejasi va vitaminlar.",
+        "<b>🥗 Nargiza Saidova - Pediatr-dietolog</b>\n\n<b>Tajriba:</b> 12 yil.\n<b>Qabul yo'nalishlari:</b>\n• oziq-ovqat allergiyalari;\n• vazn nazorati;\n• OIT muammolari;\n• ovqatlanish rejasi;\n• vitamin va mikroelementlar bo'yicha tavsiya;\n• ishtaha pasayishi.\n\n<b>Kimlar uchun foydali:</b>\n• kam vaznli bolalar;\n• ortiqcha vaznli bolalar;\n• tez-tez ich ketishi yoki qabziyat kuzatiladigan bolalar.",
     },
     dilshod: {
-      name: 'Dilshod Rahmonov',
+      name: '🩺 Dilshod Rahmonov',
       text:
-        "<b>Dilshod Rahmonov - Bolalar jarrohi</b>\n\n<b>Tajriba:</b> 20 yil.\n<b>Yo'nalishlari:</b>\n• kindik va chov churralari;\n• yumshoq to'qima patologiyalari;\n• uzdechka tuzatish;\n• tayanch-harakat tizimi bahosi.",
+        "<b>🩺 Dilshod Rahmonov - Bolalar jarrohi</b>\n\n<b>Tajriba:</b> 20 yil.\n<b>Qabul yo'nalishlari:</b>\n• kindik va chov churralari;\n• yumshoq to'qima patologiyalari;\n• uzdechka tuzatish;\n• tayanch-harakat tizimi bahosi;\n• kichik jarrohlik ko'riklari;\n• tug'ma nuqsonlar bo'yicha maslahat.\n\n<b>Qabulga qachon murojaat qilish kerak:</b>\n• shish yoki bo'rtma paydo bo'lsa;\n• bola yurishida noqulaylik bo'lsa;\n• jarrohlik bahosi kerak bo'lsa.",
     },
   },
   ru: {
     malika: {
-      name: 'Малика Алишеровна',
+      name: '🧠 Малика Алишеровна',
       text:
-        '<b>Малика Алишеровна - Детский невролог</b>\n\n<b>Стаж:</b> более 25 лет.\n<b>Направления:</b>\n• задержка речевого развития;\n• последствия гипоксии;\n• СДВГ;\n• реабилитация при ДЦП и РАС;\n• головные боли и нарушения сна.',
+        '<b>🧠 Малика Алишеровна - Детский невролог</b>\n\n<b>Стаж:</b> более 25 лет.\n<b>Направления:</b>\n• задержка речевого развития;\n• последствия гипоксии;\n• СДВГ;\n• реабилитация при ДЦП и РАС;\n• головные боли и нарушения сна.',
     },
     anvar: {
-      name: 'Анвар Хакимов',
+      name: '⚡ Анвар Хакимов',
       text:
-        '<b>Анвар Хакимов - Невролог-эпилептолог</b>\n\n<b>Стаж:</b> 15 лет.\n<b>Направления:</b>\n• ЭЭГ и мониторинг;\n• нарушения сна;\n• тики и заикание;\n• восстановление после травм.',
+        '<b>⚡ Анвар Хакимов - Невролог-эпилептолог</b>\n\n<b>Стаж:</b> 15 лет.\n<b>Направления:</b>\n• ЭЭГ и мониторинг;\n• нарушения сна;\n• тики и заикание;\n• восстановление после травм.',
     },
     lola: {
-      name: 'Лола Киримова',
+      name: '👂 Лола Киримова',
       text:
-        '<b>Лола Киримова - ЛОР-врач</b>\n\n<b>Стаж:</b> 18 лет.\n<b>Направления:</b>\n• аденоиды;\n• хронический тонзиллит;\n• отиты;\n• синуситы и аллергический ринит.',
+        '<b>👂 Лола Киримова - ЛОР-врач</b>\n\n<b>Стаж:</b> 18 лет.\n<b>Направления:</b>\n• аденоиды;\n• хронический тонзиллит;\n• отиты;\n• синуситы и аллергический ринит.',
     },
     sanjar: {
-      name: 'Санжар Юсупов',
+      name: '👁 Санжар Юсупов',
       text:
-        '<b>Санжар Юсупов - Детский офтальмолог</b>\n\n<b>Стаж:</b> 14 лет.\n<b>Направления:</b>\n• миопия;\n• косоглазие;\n• амблиопия;\n• подбор линз и диагностика зрения.',
+        '<b>👁 Санжар Юсупов - Детский офтальмолог</b>\n\n<b>Стаж:</b> 14 лет.\n<b>Направления:</b>\n• миопия;\n• косоглазие;\n• амблиопия;\n• подбор линз и диагностика зрения.',
     },
     nargiza: {
-      name: 'Наргиза Саидова',
+      name: '🥗 Наргиза Саидова',
       text:
-        '<b>Наргиза Саидова - Педиатр-диетолог</b>\n\n<b>Стаж:</b> 12 лет.\n<b>Направления:</b>\n• пищевые аллергии;\n• контроль веса;\n• проблемы ЖКТ;\n• план питания и витамины.',
+        '<b>🥗 Наргиза Саидова - Педиатр-диетолог</b>\n\n<b>Стаж:</b> 12 лет.\n<b>Направления:</b>\n• пищевые аллергии;\n• контроль веса;\n• проблемы ЖКТ;\n• план питания и витамины.',
     },
     dilshod: {
-      name: 'Дильшод Рахмонов',
+      name: '🩺 Дильшод Рахмонов',
       text:
-        '<b>Дильшод Рахмонов - Детский хирург</b>\n\n<b>Стаж:</b> 20 лет.\n<b>Направления:</b>\n• пупочные и паховые грыжи;\n• патологии мягких тканей;\n• коррекция уздечки;\n• оценка опорно-двигательной системы.',
+        '<b>🩺 Дильшод Рахмонов - Детский хирург</b>\n\n<b>Стаж:</b> 20 лет.\n<b>Направления:</b>\n• пупочные и паховые грыжи;\n• патологии мягких тканей;\n• коррекция уздечки;\n• оценка опорно-двигательной системы.',
     },
   },
 };
@@ -160,7 +212,7 @@ async function sendSpecialistList(ctx, lang) {
 }
 
 async function relaySupportReply(ctx) {
-  if (!SUPPORT_CHAT_ID || ctx.chat.id !== SUPPORT_CHAT_ID) {
+  if (!supportChatId || ctx.chat.id !== supportChatId) {
     return false;
   }
 
@@ -186,6 +238,30 @@ bot.start((ctx) => {
   userLanguage.set(ctx.chat.id, 'uz');
   activeSpecialistChats.delete(ctx.chat.id);
   ctx.reply(`${TEXT.uz.welcome} / ${TEXT.ru.welcome}`, getMainLanguageKeyboard());
+});
+
+bot.command('chatid', async (ctx) => {
+  await ctx.reply(`Chat ID: ${ctx.chat.id}`);
+});
+
+bot.command('myid', async (ctx) => {
+  await ctx.reply(`User ID: ${ctx.from.id}`);
+});
+
+bot.command('setchatid', async (ctx) => {
+  const lang = userLanguage.get(ctx.chat.id) || 'uz';
+
+  if (!ensureOwner(ctx)) {
+    await ctx.reply(TEXT[lang].ownerOnly);
+    return;
+  }
+
+  config.ownerUserId = ownerUserId;
+  config.supportChatId = ctx.chat.id;
+  supportChatId = ctx.chat.id;
+  saveConfig(config);
+
+  await ctx.reply(`${TEXT[lang].ownerSaved(ownerUserId)}\nOperator chat ulandi.\nChat ID: ${supportChatId}`);
 });
 
 bot.on('text', async (ctx) => {
@@ -231,17 +307,18 @@ bot.on('text', async (ctx) => {
   }
 
   if (activeChat) {
-    if (!SUPPORT_CHAT_ID) {
+    if (!supportChatId) {
       return ctx.reply(TEXT[lang].supportUnavailable, getChatKeyboard(lang));
     }
 
     const doctorName = doctorData[activeChat.lang][activeChat.doctorKey].name;
     const supportMessage = await bot.telegram.sendMessage(
-      SUPPORT_CHAT_ID,
+      supportChatId,
       [
         `Mutaxassis: ${doctorName}`,
         `Foydalanuvchi: ${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`.trim(),
         `Username: ${ctx.from.username ? `@${ctx.from.username}` : "yo'q"}`,
+        `Chat ID: ${chatId}`,
         `User ID: ${chatId}`,
         '',
         text,

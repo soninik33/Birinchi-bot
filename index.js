@@ -1,88 +1,290 @@
 const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
+
 const app = express();
+const PORT = process.env.PORT || 1000;
+const BOT_TOKEN = process.env.BOT_TOKEN || '8679972956:AAGYXhdlzh84_EzOc-1iVoY5HgmiGHPZj5Y';
+const SUPPORT_CHAT_ID = process.env.SUPPORT_CHAT_ID ? Number(process.env.SUPPORT_CHAT_ID) : null;
 
 app.get('/', (req, res) => res.send('Bot is running!'));
-const PORT = process.env.PORT || 1000;
 app.listen(PORT, '0.0.0.0', () => console.log(`Server port ${PORT} da ishlamoqda`));
 
-setInterval(() => { console.log("Bot faol..."); }, 300000);
+setInterval(() => {
+  console.log('Bot faol...');
+}, 300000);
 
-const bot = new Telegraf('8679972956:AAGYXhdlzh84_EzOc-1iVoY5HgmiGHPZj5Y');
-const userLanguage = {};
+const bot = new Telegraf(BOT_TOKEN);
+const userLanguage = new Map();
+const activeSpecialistChats = new Map();
+const supportReplyMap = new Map();
 
-const doctorData = {
-    uz: {
-        malika: { link: "https://t.me/MedPediatr_Bot", text: "<b>🩺 Malika Alisherovna — Bolalar nevrologi (Oliy toifali)</b>\n\n<b>Tajriba:</b> 25 yildan ortiq. Neyrofiziologiya bo'yicha ekspert.\n\n<b>Mutaxassisligi:</b>\n• Nutq rivojlanishi kechikishi (NRT, ZPRR) - zamonaviy diagnostika;\n• Tug'ruq paytidagi gipoksiya oqibatlari;\n• DEGS (Diqqat yetishmasligi va giperaktivlik sindromi) bo'yicha kompleks yondashuv;\n• Bolalar serebral falaji (BSF) va autizm spektridagi buzilishlar (ASB) reabilitatsiyasi;\n• O'smirlarda surunkali bosh og'riqlari va uyqu buzilishlarini davolash.\n\n<b>Yondashuv:</b> Neyropsixologik korreksiya va dori-darmonlarsiz terapiya usullari." },
-        anvar: { link: "https://t.me/MedPediatrAbot", text: "<b>🧠 Anvar Xakimov — Nevrolog-epileptolog, tibbiyot fanlari nomzodi</b>\n\n<b>Tajriba:</b> 15 yil. Epilepsiya diagnostikasida yuqori natijalar.\n\n<b>Xizmatlar:</b>\n• EEG (Elektroensefalografiya) – monitoring va yuqori aniqlikdagi tahlil;\n• Tungi uyqu buzilishlari: uyquda yurish, tungi dahshatlar (parasomniya);\n• Tiklar, duduqlanish va asabiy spazmlar uchun individual terapiya sxemalari;\n• Bosh miya jarohatlaridan keyingi kognitiv funksiyalarni tiklash.\n\n<b>Prinsip:</b> Dalillarga asoslangan tibbiyot va bemor xavfsizligini ta'minlash." },
-        lola: { link: "https://t.me/MedPediatrLbot", text: "<b>👂 Lola Kirimova — Oliy toifali LOR-shifokor</b>\n\n<b>Tajriba:</b> 18 yil. Jarrohliksiz davolash tarafdori.\n\n<b>Yo'nalishlar:</b>\n• Adenoidit (II-III darajali) – operatsiyasiz davolash metodikasi;\n• Surunkali tonzillit va doimiy tomoq og'rig'ini bartaraf etish;\n• O'tkir va surunkali otitlar, eshitish qobiliyatini tiklash;\n• Sinusit, gaymorit va allergik rinitni kompleks fizioterapiya qilish;\n• Burun-halqum kasalliklarini diagnostika qilish va profilaktika qilish.\n\n<b>Natija:</b> Nafas yo'llarini tozalash va antibiotiklarsiz sog'lom hayot." },
-        sanjar: { link: "https://t.me/MedPediatrSbot", text: "<b>👁️ Sanjar Yusupov — Bolalar oftalmologi, jarroh</b>\n\n<b>Tajriba:</b> 14 yil. Ko'rish qobiliyatini apparatli davolash bo'yicha ekspert.\n\n<b>Imkoniyatlar:</b>\n• Maktab o'quvchilarida miopiya (yaqindan ko'ra olmaslik) progressini to'xtatish;\n• G'ilaylik (strabizm) ni operatsiyasiz tuzatish;\n• Ambliopiya („dangasa ko'z“) davosi;\n• Tungi linzalar (Orto-keratologiya) tanlash va ularni o'rnatish;\n• Zamonaviy optik va apparatli ko'rish diagnostikasi.\n\n<b>Yondashuv:</b> Bolalar uchun qulay va qiziqarli ko'rishni tekshirish muolajalari." },
-        nargiza: { link: "https://t.me/MedPediatrNbot", text: "<b>🍏 Nargiza Saidova — Pediatr-dietolog, nutritsiolog</b>\n\n<b>Tajriba:</b> 12 yil. Salomatlikni to'g'ri ovqatlanish bilan mustahkamlash.\n\n<b>Asosiy yordam:</b>\n• Oziq-ovqat allergiyalari (laktoza, glyuten) bo'yicha maxsus ratsion;\n• Semizlik yoki kam vazn bo'yicha individual dasturlar;\n• Oshqozon-ichak tizimi (OIT) faoliyatini tiklash va disbakteriozni davolash;\n• Immunitetni oshiruvchi vitaminlar kompleksi va ovqatlanish jadvali;\n• Tez-tez kasal bo'ladigan bolalar uchun reabilitatsiya rejasi.\n\n<b>Maqsad:</b> Ovqatlanishni salomatlikning asosiy ustuniga aylantirish." },
-        dilshod: { link: "https://t.me/MedPediatrRbot", text: "<b>✂️ Dilshod Rahmonov — Bolalar jarrohi (Oliy toifa)</b>\n\n<b>Tajriba:</b> 20 yil. Katta tajriba va yuqori professionallik.\n\n<b>Soha:</b>\n• Kindik va chov churralarini erta aniqlash va monitoring;\n• Teri va yumshoq to'qimalarning rivojlanish patologiyalari;\n• Til va lab yuzangisini (уздечка) tez va og'riqsiz tuzatish;\n• Tayanch-harakat tizimi: yassi oyoqlik va qomat buzilishlarini baholash;\n• Bolalar jarrohligi bo'yicha to'liq maslahat va operatsiyadan keyingi kuzatuv.\n\n<b>Yondashuv:</b> Ishonch va xotirjamlik – ota-onalar uchun eng muhim ko'mak." }
-    },
-    ru: {
-        malika: { link: "https://t.me/MedPediatr_Bot", text: "<b>🩺 Малика Алишеровна — Детский невролог высшей категории</b>\n\n<b>Стаж:</b> 25+ лет. Эксперт в нейрофизиологии.\n\n<b>Специализация:</b>\n• Диагностика ЗРР, ЗПРР;\n• Нейропсихологическая оценка состояния развития ребенка;\n• Лечение последствий перинатальных поражений ЦНС и гипоксии;\n• Коррекция СДВГ и тревожности;\n• Реабилитация при ДЦП и расстройствах аутистического спектра (РАС);\n• Хронические головные боли и нарушения сна у подростков.\n\n<b>Подход:</b> Безопасные методы нейрокоррекции, без лишней химии." },
-        anvar: { link: "https://t.me/MedPediatrAbot", text: "<b>🧠 Анвар Хакимов — Невролог-эпилептолог, к.м.н.</b>\n\n<b>Стаж:</b> 15 лет. Ведущий эксперт по детской эпилептологии.\n\n<b>Основные направления:</b>\n• Высокоточная расшифровка ЭЭГ, видео-ЭЭГ мониторинг сна;\n• Лечение ночных страхов, лунатизма и инсомнии;\n• Терапия тиков и заикания;\n• Восстановление функций после травм и инфекций;\n• Индивидуальный подбор противосудорожной терапии.\n\n<b>Гарантия:</b> Профессиональный подход к самым сложным случаям." },
-        lola: { link: "https://t.me/MedPediatrLbot", text: "<b>👂 Лола Киримова — ЛОР-врач высшей категории</b>\n\n<b>Стаж:</b> 18 лет. Сторонник консервативного лечения.\n\n<b>Услуги:</b>\n• Лечение аденоидов II-III степени (без операций);\n• Терапия хронических тонзиллитов и профилактика ангин;\n• Лечение отитов, восстановление слуховой функции;\n• Терапия ринитов, гайморитов и аллергий;\n• Современные физиопроцедуры для ЛОР-органов.\n\n<b>Результат:</b> Свободное дыхание без сосудосуживающих капель." },
-        sanjar: { link: "https://t.me/MedPediatrSbot", text: "<b>👁️ Санжар Юсупов — Детский офтальмолог, хирург</b>\n\n<b>Стаж:</b> 14 лет. Эксперт по аппаратной коррекции.\n\n<b>Что мы предлагаем:</b>\n• Остановка прогрессирования миопии;\n• Безоперационная коррекция косоглазия и амблиопии;\n• Подбор ночных линз и сложной оптики;\n• Глубокое исследование глазного дна на новейшем оборудовании;\n• Профессиональный мониторинг зрения школьников.\n\n<b>Опыт:</b> Индивидуальный подход, превращающий визит в комфорт." },
-        nargiza: { link: "https://t.me/MedPediatrNbot", text: "<b>🍏 Наргиза Саидова — Педиатр-диетолог, нутрициолог</b>\n\n<b>Стаж:</b> 12 лет. Специалист по детскому здоровью.\n\n<b>Направления:</b>\n• Рацион при пищевых аллергиях и непереносимости;\n• Работа с нарушениями пищевого поведения;\n• Восстановление ЖКТ и обмена веществ;\n• Программы питания для часто болеющих детей;\n• Индивидуальный расчет нутриентов для гармоничного роста.\n\n<b>Цель:</b> Питание как инструмент укрепления иммунитета." },
-        dilshod: { link: "https://t.me/MedPediatrRbot", text: "<b>✂️ Дильшод Рахмонов — Детский хирург высшей категории</b>\n\n<b>Стаж:</b> 20 лет. Хирург с огромным опытом.\n\n<b>С чем обращаются:</b>\n• Грыжи (пупочные, паховые) – наблюдение;\n• Патологии мягких тканей;\n• Коррекция уздечки языка и губ;\n• Оценка опорно-двигательного аппарата, плоскостопие;\n• Консультации по экстренной хирургии.\n\n<b>Отношение:</b> Качественная помощь без лишнего стресса для ребенка." }
-    }
+const TEXT = {
+  uz: {
+    welcome: "MedPediatr ga xush kelibsiz! Tilni tanlang:",
+    askDoctor: "Shifokor bilan bog'lanishni istaysizmi?",
+    wait: 'Iltimos, 5 soniya kuting...',
+    chooseSpecialist: 'Mutaxassisni tanlang:',
+    startChat: 'Mutaxassis bilan suhbatni boshlash',
+    back: 'Orqaga',
+    finishChat: 'Suhbatni yakunlash',
+    noDoctor: 'Tushunarli, xayr!',
+    chatStarted: (name) =>
+      `${name} tanlandi.\n\nEndi shu yerga xabaringizni yozing. Xabar mutaxassisga yuboriladi.`,
+    chatClosed: 'Mutaxassis bilan suhbat yakunlandi.',
+    sentToSpecialist: (name) => `Xabaringiz ${name} ga yuborildi. Javob shu bot ichida keladi.`,
+    supportUnavailable:
+      "Hozircha operator chat ulanmagan. SUPPORT_CHAT_ID ni sozlaganingizdan keyin xabarlar mutaxassisga yuboriladi.",
+    specialistReplyPrefix: (name) => `${name} javobi:`,
+  },
+  ru: {
+    welcome: 'Добро пожаловать в MedPediatr! Выберите язык:',
+    askDoctor: 'Вы хотите связаться с врачом?',
+    wait: 'Пожалуйста, подождите 5 секунд...',
+    chooseSpecialist: 'Выберите специалиста:',
+    startChat: 'Начать чат со специалистом',
+    back: 'Назад',
+    finishChat: 'Завершить чат',
+    noDoctor: 'Понятно, до свидания!',
+    chatStarted: (name) =>
+      `${name} выбран.\n\nТеперь напишите сообщение сюда. Оно будет отправлено специалисту.`,
+    chatClosed: 'Чат со специалистом завершен.',
+    sentToSpecialist: (name) => `Ваше сообщение отправлено специалисту ${name}. Ответ придет в этом же боте.`,
+    supportUnavailable:
+      'Чат для операторов пока не подключен. После настройки SUPPORT_CHAT_ID сообщения будут уходить специалисту.',
+    specialistReplyPrefix: (name) => `Ответ специалиста ${name}:`,
+  },
 };
 
-const getDoctorButtons = () => Markup.inlineKeyboard([
-    [{ text: "🩺 Малика Алишеровна", callback_data: "info_malika" }, { text: "🧠 Анвар Хакимов", callback_data: "info_anvar" }],
-    [{ text: "👂 Лола Киримова", callback_data: "info_lola" }, { text: "👁️ Санжар Юсупов", callback_data: "info_sanjar" }],
-    [{ text: "🍏 Наргиза Саидова", callback_data: "info_nargiza" }, { text: "✂️ Дильшод Рахмонов", callback_data: "info_dilshod" }]
-]);
+const doctorData = {
+  uz: {
+    malika: {
+      name: 'Malika Alisherovna',
+      text:
+        "<b>Malika Alisherovna - Bolalar nevrologi (oliy toifali)</b>\n\n<b>Tajriba:</b> 25 yildan ortiq.\n<b>Yo'nalishlari:</b>\n• nutq rivojlanishi kechikishi;\n• tug'ruq paytidagi gipoksiya oqibatlari;\n• DEGS bo'yicha kompleks yondashuv;\n• BSF va ASB reabilitatsiyasi;\n• surunkali bosh og'riqlari va uyqu buzilishlari.",
+    },
+    anvar: {
+      name: 'Anvar Xakimov',
+      text:
+        "<b>Anvar Xakimov - Nevrolog-epileptolog</b>\n\n<b>Tajriba:</b> 15 yil.\n<b>Yo'nalishlari:</b>\n• EEG monitoring va tahlil;\n• tungi uyqu buzilishlari;\n• tiklar va duduqlanish;\n• bosh miya jarohatlaridan keyingi tiklanish.",
+    },
+    lola: {
+      name: 'Lola Kirimova',
+      text:
+        "<b>Lola Kirimova - LOR-shifokor</b>\n\n<b>Tajriba:</b> 18 yil.\n<b>Yo'nalishlari:</b>\n• adenoidit;\n• surunkali tonzillit;\n• otit;\n• sinusit va allergik rinit.",
+    },
+    sanjar: {
+      name: 'Sanjar Yusupov',
+      text:
+        "<b>Sanjar Yusupov - Bolalar oftalmologi</b>\n\n<b>Tajriba:</b> 14 yil.\n<b>Yo'nalishlari:</b>\n• miopiya;\n• g'ilaylik;\n• ambliopiya;\n• tungi linzalar va ko'rish diagnostikasi.",
+    },
+    nargiza: {
+      name: 'Nargiza Saidova',
+      text:
+        "<b>Nargiza Saidova - Pediatr-dietolog</b>\n\n<b>Tajriba:</b> 12 yil.\n<b>Yo'nalishlari:</b>\n• oziq-ovqat allergiyalari;\n• vazn nazorati;\n• OIT muammolari;\n• ovqatlanish rejasi va vitaminlar.",
+    },
+    dilshod: {
+      name: 'Dilshod Rahmonov',
+      text:
+        "<b>Dilshod Rahmonov - Bolalar jarrohi</b>\n\n<b>Tajriba:</b> 20 yil.\n<b>Yo'nalishlari:</b>\n• kindik va chov churralari;\n• yumshoq to'qima patologiyalari;\n• uzdechka tuzatish;\n• tayanch-harakat tizimi bahosi.",
+    },
+  },
+  ru: {
+    malika: {
+      name: 'Малика Алишеровна',
+      text:
+        '<b>Малика Алишеровна - Детский невролог</b>\n\n<b>Стаж:</b> более 25 лет.\n<b>Направления:</b>\n• задержка речевого развития;\n• последствия гипоксии;\n• СДВГ;\n• реабилитация при ДЦП и РАС;\n• головные боли и нарушения сна.',
+    },
+    anvar: {
+      name: 'Анвар Хакимов',
+      text:
+        '<b>Анвар Хакимов - Невролог-эпилептолог</b>\n\n<b>Стаж:</b> 15 лет.\n<b>Направления:</b>\n• ЭЭГ и мониторинг;\n• нарушения сна;\n• тики и заикание;\n• восстановление после травм.',
+    },
+    lola: {
+      name: 'Лола Киримова',
+      text:
+        '<b>Лола Киримова - ЛОР-врач</b>\n\n<b>Стаж:</b> 18 лет.\n<b>Направления:</b>\n• аденоиды;\n• хронический тонзиллит;\n• отиты;\n• синуситы и аллергический ринит.',
+    },
+    sanjar: {
+      name: 'Санжар Юсупов',
+      text:
+        '<b>Санжар Юсупов - Детский офтальмолог</b>\n\n<b>Стаж:</b> 14 лет.\n<b>Направления:</b>\n• миопия;\n• косоглазие;\n• амблиопия;\n• подбор линз и диагностика зрения.',
+    },
+    nargiza: {
+      name: 'Наргиза Саидова',
+      text:
+        '<b>Наргиза Саидова - Педиатр-диетолог</b>\n\n<b>Стаж:</b> 12 лет.\n<b>Направления:</b>\n• пищевые аллергии;\n• контроль веса;\n• проблемы ЖКТ;\n• план питания и витамины.',
+    },
+    dilshod: {
+      name: 'Дильшод Рахмонов',
+      text:
+        '<b>Дильшод Рахмонов - Детский хирург</b>\n\n<b>Стаж:</b> 20 лет.\n<b>Направления:</b>\n• пупочные и паховые грыжи;\n• патологии мягких тканей;\n• коррекция уздечки;\n• оценка опорно-двигательной системы.',
+    },
+  },
+};
+
+function getMainLanguageKeyboard() {
+  return Markup.keyboard([["🇺🇿 O'zbekcha", '🇷🇺 Русский']]).oneTime().resize();
+}
+
+function getDoctorButtons(lang) {
+  const names = doctorData[lang];
+  return Markup.inlineKeyboard([
+    [
+      { text: names.malika.name, callback_data: 'info_malika' },
+      { text: names.anvar.name, callback_data: 'info_anvar' },
+    ],
+    [
+      { text: names.lola.name, callback_data: 'info_lola' },
+      { text: names.sanjar.name, callback_data: 'info_sanjar' },
+    ],
+    [
+      { text: names.nargiza.name, callback_data: 'info_nargiza' },
+      { text: names.dilshod.name, callback_data: 'info_dilshod' },
+    ],
+  ]);
+}
+
+function getDoctorActionButtons(lang, doctorKey) {
+  return Markup.inlineKeyboard([
+    [{ text: TEXT[lang].startChat, callback_data: `start_chat_${doctorKey}` }],
+    [{ text: TEXT[lang].back, callback_data: 'back_to_list' }],
+  ]);
+}
+
+function getChatKeyboard(lang) {
+  return Markup.keyboard([[TEXT[lang].finishChat]]).resize();
+}
+
+async function sendSpecialistList(ctx, lang) {
+  await ctx.reply(TEXT[lang].chooseSpecialist, getDoctorButtons(lang));
+}
+
+async function relaySupportReply(ctx) {
+  if (!SUPPORT_CHAT_ID || ctx.chat.id !== SUPPORT_CHAT_ID) {
+    return false;
+  }
+
+  const replyTo = ctx.message.reply_to_message;
+  if (!replyTo || !supportReplyMap.has(replyTo.message_id)) {
+    return false;
+  }
+
+  const target = supportReplyMap.get(replyTo.message_id);
+  const lang = target.lang || 'uz';
+  const doctorName = doctorData[lang][target.doctorKey]?.name || target.doctorKey;
+
+  await bot.telegram.sendMessage(
+    target.userId,
+    `${TEXT[lang].specialistReplyPrefix(doctorName)}\n${ctx.message.text}`
+  );
+
+  await ctx.reply(`Yuborildi: ${doctorName} -> ${target.userId}`);
+  return true;
+}
 
 bot.start((ctx) => {
-    ctx.reply('MedPediatr ga xush kelibsiz! Tilni tanlang / Добро пожаловать в MedPediatr! Выберите язык:', Markup.keyboard([['🇺🇿 O\'zbekcha', '🇷🇺 Русский']]).oneTime().resize());
+  userLanguage.set(ctx.chat.id, 'uz');
+  activeSpecialistChats.delete(ctx.chat.id);
+  ctx.reply(`${TEXT.uz.welcome} / ${TEXT.ru.welcome}`, getMainLanguageKeyboard());
 });
 
 bot.on('text', async (ctx) => {
-    const text = ctx.message.text;
-    const chatId = ctx.chat.id;
+  if (await relaySupportReply(ctx)) {
+    return;
+  }
 
-    if (text === '🇺🇿 O\'zbekcha') {
-        userLanguage[chatId] = 'uz';
-        return ctx.reply('Shifokor bilan bog\'lanishni istaysizmi?', Markup.keyboard([['Ha', 'Yo\'q']]).oneTime().resize());
-    }
-    if (text === '🇷🇺 Русский') {
-        userLanguage[chatId] = 'ru';
-        return ctx.reply('Вы хотите связаться с врачом?', Markup.keyboard([['Да', 'Нет']]).oneTime().resize());
+  const text = ctx.message.text;
+  const chatId = ctx.chat.id;
+
+  if (text === "🇺🇿 O'zbekcha") {
+    userLanguage.set(chatId, 'uz');
+    activeSpecialistChats.delete(chatId);
+    return ctx.reply(TEXT.uz.askDoctor, Markup.keyboard([['Ha', "Yo'q"]]).oneTime().resize());
+  }
+
+  if (text === '🇷🇺 Русский') {
+    userLanguage.set(chatId, 'ru');
+    activeSpecialistChats.delete(chatId);
+    return ctx.reply(TEXT.ru.askDoctor, Markup.keyboard([['Да', 'Нет']]).oneTime().resize());
+  }
+
+  const lang = userLanguage.get(chatId) || 'uz';
+  const activeChat = activeSpecialistChats.get(chatId);
+
+  if (text === TEXT[lang].finishChat) {
+    activeSpecialistChats.delete(chatId);
+    await ctx.reply(TEXT[lang].chatClosed, Markup.removeKeyboard());
+    return sendSpecialistList(ctx, lang);
+  }
+
+  if (text === 'Ha' || text === 'Да') {
+    await ctx.reply(TEXT[lang].wait);
+    setTimeout(() => {
+      ctx.reply(TEXT[lang].chooseSpecialist, getDoctorButtons(lang));
+    }, 5000);
+    return;
+  }
+
+  if (text === "Yo'q" || text === 'Нет') {
+    activeSpecialistChats.delete(chatId);
+    return ctx.reply(TEXT[lang].noDoctor, Markup.removeKeyboard());
+  }
+
+  if (activeChat) {
+    if (!SUPPORT_CHAT_ID) {
+      return ctx.reply(TEXT[lang].supportUnavailable, getChatKeyboard(lang));
     }
 
-    const lang = userLanguage[chatId] || 'uz';
-    if (text === 'Ha' || text === 'Да') {
-        await ctx.reply(lang === 'uz' ? 'Iltimos, 5 soniya kuting...' : 'Пожалуйста, подождите 5 секунд...');
-        setTimeout(() => {
-            ctx.reply(lang === 'uz' ? 'Mutaxassisni tanlang:' : 'Выберите специалиста:', getDoctorButtons());
-        }, 5000);
-    } else if (text === 'Yo\'q' || text === 'Нет') {
-        ctx.reply(lang === 'uz' ? 'Tushunarli, xayr!' : 'Понятно, тогда Досвидос!');
-    }
+    const doctorName = doctorData[activeChat.lang][activeChat.doctorKey].name;
+    const supportMessage = await bot.telegram.sendMessage(
+      SUPPORT_CHAT_ID,
+      [
+        `Mutaxassis: ${doctorName}`,
+        `Foydalanuvchi: ${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`.trim(),
+        `Username: ${ctx.from.username ? `@${ctx.from.username}` : "yo'q"}`,
+        `User ID: ${chatId}`,
+        '',
+        text,
+      ].join('\n')
+    );
+
+    supportReplyMap.set(supportMessage.message_id, {
+      userId: chatId,
+      doctorKey: activeChat.doctorKey,
+      lang: activeChat.lang,
+    });
+
+    return ctx.reply(TEXT[lang].sentToSpecialist(doctorName), getChatKeyboard(lang));
+  }
 });
 
 bot.action(/info_(.+)/, async (ctx) => {
-    const doctorKey = ctx.match[1];
-    const lang = userLanguage[ctx.chat.id] || 'uz';
-    const data = doctorData[lang][doctorKey];
-    await ctx.answerCbQuery();
-    await ctx.editMessageText(data.text, {
-        parse_mode: 'HTML',
-        ...Markup.inlineKeyboard([
-            [Markup.button.url(lang === 'uz' ? 'Shifokorga yozish 💬' : 'Написать врачу 💬', data.link)],
-            [Markup.button.callback(lang === 'uz' ? '⬅️ Orqaga' : '⬅️ Назад', 'back_to_list')]
-        ])
-    });
+  const doctorKey = ctx.match[1];
+  const lang = userLanguage.get(ctx.chat.id) || 'uz';
+  const data = doctorData[lang][doctorKey];
+
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(data.text, {
+    parse_mode: 'HTML',
+    ...getDoctorActionButtons(lang, doctorKey),
+  });
+});
+
+bot.action(/start_chat_(.+)/, async (ctx) => {
+  const doctorKey = ctx.match[1];
+  const lang = userLanguage.get(ctx.chat.id) || 'uz';
+  const doctorName = doctorData[lang][doctorKey].name;
+
+  activeSpecialistChats.set(ctx.chat.id, { doctorKey, lang });
+  await ctx.answerCbQuery();
+  await ctx.reply(TEXT[lang].chatStarted(doctorName), getChatKeyboard(lang));
 });
 
 bot.action('back_to_list', async (ctx) => {
-    const lang = userLanguage[ctx.chat.id] || 'uz';
-    await ctx.answerCbQuery();
-    await ctx.editMessageText(lang === 'uz' ? 'Mutaxassisni tanlang:' : 'Выберите специалиста:', getDoctorButtons());
+  const lang = userLanguage.get(ctx.chat.id) || 'uz';
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(TEXT[lang].chooseSpecialist, getDoctorButtons(lang));
 });
 
 bot.launch();
-console.log("Бот запущени, слушает команды!");
+console.log('Bot ishga tushdi.');

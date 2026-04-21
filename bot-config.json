@@ -1,4 +1,5 @@
 {
   "supportChatId": null,
-  "ownerUserId": null
+  "ownerUserId": null,
+  "activeChats": {}
 }

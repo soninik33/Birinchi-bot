@@ -126,6 +126,7 @@ const TEXT = {
   invalidPhone: 'Telefon raqamini to`g`ri formatda yuboring. Masalan: +998901234567',
   bookingCreated: (doctorName, slot) =>
     `${doctorName} uchun ${slot} vaqtiga so'rov yaratildi. Operator siz bilan bog'lanadi.`,
+  bookingReplyPrefix: 'Bron bo`yicha operator javobi:',
   noPendingBookings: 'Hozircha pending bronlar yo`q.',
 };
 
@@ -493,6 +494,7 @@ async function createBooking(ctx) {
   if (supportChatId) {
     const sent = await bot.telegram.sendMessage(supportChatId, buildBookingSupportText(booking));
     supportMessageTargets.set(sent.message_id, {
+      kind: 'booking',
       targetUserId: ctx.chat.id,
       doctorKey: booking.doctorKey,
       bookingId: booking.id,
@@ -528,6 +530,7 @@ async function forwardMessageToSupport(ctx, activeChat) {
 
   const metaMessage = await bot.telegram.sendMessage(supportChatId, metaText);
   supportMessageTargets.set(metaMessage.message_id, {
+    kind: 'chat',
     targetUserId: ctx.chat.id,
     doctorKey: activeChat.doctorKey,
   });
@@ -540,6 +543,7 @@ async function forwardMessageToSupport(ctx, activeChat) {
     );
 
     supportMessageTargets.set(copiedMessage.message_id, {
+      kind: 'chat',
       targetUserId: ctx.chat.id,
       doctorKey: activeChat.doctorKey,
     });
@@ -564,23 +568,53 @@ async function relaySupportReply(ctx) {
   }
 
   const activeChat = activeSpecialistChats.get(targetUserId);
+  const isBookingReply = mappedTarget?.kind === 'booking';
   const doctorName =
     doctorData[mappedTarget?.doctorKey || activeChat?.doctorKey]?.name || 'Mutaxassis';
+  const replyKeyboard = isBookingReply ? getMainKeyboard() : getChatKeyboard();
+
+  if (isBookingReply && mappedTarget?.bookingId) {
+    const booking = (config.bookings || []).find((item) => item.id === mappedTarget.bookingId);
+    if (booking && booking.status === 'pending') {
+      booking.status = 'contacted';
+      booking.updatedAt = new Date().toISOString();
+      persistConfig();
+    }
+  }
 
   if (ctx.message.text) {
     await bot.telegram.sendMessage(
       targetUserId,
-      `${TEXT.specialistReplyPrefix(doctorName)}\n${ctx.message.text}`,
-      { reply_markup: getChatKeyboard().reply_markup }
+      `${
+        isBookingReply ? TEXT.bookingReplyPrefix : TEXT.specialistReplyPrefix(doctorName)
+      }\n${ctx.message.text}`,
+      { reply_markup: replyKeyboard.reply_markup }
     );
   } else {
-    await bot.telegram.sendMessage(targetUserId, TEXT.specialistReplyPrefix(doctorName), {
-      reply_markup: getChatKeyboard().reply_markup,
-    });
+    await bot.telegram.sendMessage(
+      targetUserId,
+      isBookingReply ? TEXT.bookingReplyPrefix : TEXT.specialistReplyPrefix(doctorName),
+      {
+        reply_markup: replyKeyboard.reply_markup,
+      }
+    );
     await bot.telegram.copyMessage(targetUserId, ctx.chat.id, ctx.message.message_id);
   }
 
-  await ctx.reply(`Yuborildi -> ${targetUserId}`);
+  if (!isBookingReply && !activeSpecialistChats.has(targetUserId) && mappedTarget?.doctorKey) {
+    activeSpecialistChats.set(targetUserId, {
+      doctorKey: mappedTarget.doctorKey,
+      startedAt: new Date().toISOString(),
+    });
+    persistConfig();
+  }
+
+  if (isBookingReply && mappedTarget?.bookingId) {
+    await ctx.reply(`Booking javobi yuborildi -> ${targetUserId}`);
+  } else {
+    await ctx.reply(`Yuborildi -> ${targetUserId}`);
+  }
+
   return true;
 }
 

@@ -35,7 +35,7 @@ const config = loadConfig();
 
 const BOT_TOKEN = process.env.BOT_TOKEN || config.botToken;
 if (!BOT_TOKEN) {
-  console.error('8679972956:AAGYXhdlzh84_EzOc-1iVoY5HgmiGHPZj5Y');
+  console.error('❌ BOT_TOKEN topilmadi! Iltimos, uni .env fayliga yozing.');
   process.exit(1);
 }
 

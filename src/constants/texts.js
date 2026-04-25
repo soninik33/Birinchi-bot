@@ -16,7 +16,7 @@ const TEXTS = {
     chatStarted: (doctorName) => `<b>${doctorName}</b> tanlandi.\n\n📝 Endi savolingizni matn, rasm, video yoki audio ko'rinishida yuborishingiz mumkin.`,
     sentToSpecialist: (doctorName) => `📩 Xabaringiz <b>${doctorName}</b> uchun operatorga yuborildi. Javobni shu yerda olasiz.`,
     specialistReplyPrefix: (doctorName) => `💬 <b>${doctorName} javobi:</b>`,
-    help: '<b>Botdan foydalanish bo\'yicha qo\'llanma:</b>\n\n/start - Bosh menyu\n/doctors - Mutaxassislar\n/book - Qabulga yozilish\n/help - Yordam\n/myid - Sizning ID\n/cancel - Bekor qilish',
+    help: '<b>Botdan foydalanish bo\'yicha qo\'llanma:</b>\n\n/start - Bosh menyu\n/doctors - Mutaxassislar\n/book - Qabulga yozilish\n/location - Bizning manzil\n/help - Yordam\n/myid - Sizning ID\n/cancel - Bekor qilish',
     emergency: '⚠️ <b>MUHIM:</b> Bot shoshilinch yordam o\'rnini bosmaydi. Vaziyat og\'ir bo\'lsa, <b>103</b> ga qo\'ng\'iroq qiling!',
     bookingCancelled: '❌ Qabulga yozilish bekor qilindi.',
     askPatientName: '👤 Bemorning ism-sharifini yuboring:',
@@ -29,6 +29,8 @@ const TEXTS = {
     bookingReplyPrefix: '🔔 <b>Bron bo\'yicha javob:</b>',
     noPendingBookings: '📭 Hozircha bronlar yo\'q.',
     chooseLang: '🌐 Tilni tanlang / Выберите язык:',
+    locationInfo: '📍 <b>Bizning manzilimiz:</b>\n\nToshkent sh., Yunusobod tumani, Bog\'ishamol ko\'chasi, 223-uy.\n\n🏥 <b>Mo\'ljal:</b> Toshkent Pediatriya Tibbiyot Instituti (SAMPI)',
+    openMap: '🗺 Xaritada ko\'rish',
   },
   ru: {
     welcome: '<b>Добро пожаловать в MedPediatr bot!</b> 👋\n\nЗдесь вы можете связаться со специалистами, получить ответы на вопросы или записаться на прием.',
@@ -44,7 +46,7 @@ const TEXTS = {
     chatStarted: (doctorName) => `Выбран <b>${doctorName}</b>.\n\n📝 Теперь вы можете отправить свой вопрос в виде текста, фото, видео или аудио.`,
     sentToSpecialist: (doctorName) => `📩 Ваше сообщение для <b>${doctorName}</b> отправлено оператору. Ответ придет сюда.`,
     specialistReplyPrefix: (doctorName) => `💬 <b>Ответ ${doctorName}:</b>`,
-    help: '<b>Руководство по использованию:</b>\n\n/start - Главное меню\n/doctors - Список врачей\n/book - Запись на прием\n/help - Помощь\n/myid - Ваш ID\n/cancel - Отмена',
+    help: '<b>Руководство по использованию:</b>\n\n/start - Главное меню\n/doctors - Список врачей\n/book - Запись на прием\n/location - Наш адрес\n/help - Помощь\n/myid - Ваш ID\n/cancel - Отмена',
     emergency: '⚠️ <b>ВАЖНО:</b> Бот не заменяет скорую помощь. При критических ситуациях звоните <b>103</b>!',
     bookingCancelled: '❌ Запись отменена.',
     askPatientName: '👤 Введите ФИО пациента:',
@@ -57,6 +59,8 @@ const TEXTS = {
     bookingReplyPrefix: '🔔 <b>Ответ по бронированию:</b>',
     noPendingBookings: '📭 Пока нет активных записей.',
     chooseLang: '🌐 Выберите язык / Tilni tanlang:',
+    locationInfo: '📍 <b>Наш адрес:</b>\n\nг. Ташкент, Юнусабадский район, ул. Богишамол, 223.\n\n🏥 <b>Ориентир:</b> Ташкентский Педиатрический Медицинский Институт (САМПИ)',
+    openMap: '🗺 Посмотреть на карте',
   }
 };
 

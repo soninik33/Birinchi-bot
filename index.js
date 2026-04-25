@@ -21,7 +21,8 @@ const {
   getDoctorButtons,
   getDoctorActionButtons,
   getBookingSlotButtons,
-  getLangKeyboard
+  getLangKeyboard,
+  getLocationKeyboard
 } = require('./src/bot/keyboards');
 
 // Handlers
@@ -32,9 +33,9 @@ const app = express();
 const PORT = Number(process.env.PORT || 1000);
 const config = loadConfig();
 
-const BOT_TOKEN = process.env.BOT_TOKEN || config.botToken || '8679972956:AAGYXhdlzh84_EzOc-1iVoY5HgmiGHPZj5Y';
+const BOT_TOKEN = process.env.BOT_TOKEN || config.botToken;
 if (!BOT_TOKEN) {
-  console.error('❌ BOT_TOKEN topilmadi!');
+  console.error('❌ BOT_TOKEN topilmadi! Iltimos, uni .env fayliga yoki bot-config.json ichiga yozing.');
   process.exit(1);
 }
 
@@ -118,6 +119,10 @@ bot.help((ctx) => {
 
 bot.command('doctors', (ctx) => handlers.sendSpecialistList(ctx));
 bot.command('book', (ctx) => handlers.sendBookingDoctorList(ctx));
+bot.command('location', (ctx) => {
+  const lang = handlers.getLang(ctx);
+  ctx.replyWithHTML(TEXTS[lang].locationInfo, getLocationKeyboard(lang));
+});
 bot.command('myid', (ctx) => ctx.reply(`Sizning ID: ${ctx.from.id}`));
 bot.command('cancel', async (ctx) => {
   const lang = handlers.getLang(ctx);
@@ -260,6 +265,9 @@ bot.on('text', async (ctx) => {
   if (text === m.booking) return handlers.sendBookingDoctorList(ctx);
   if (text === m.help) return ctx.replyWithHTML(t.help, getMainKeyboard(lang));
   if (text === m.changeLang) return handlers.askLanguage(ctx);
+  if (text === m.location) {
+    return ctx.replyWithHTML(t.locationInfo, getLocationKeyboard(lang));
+  }
   if (text === m.connect || text === m.yes) return handlers.sendSpecialistList(ctx);
   if (text === m.no || text === m.back) {
     activeSpecialistChats.delete(ctx.chat.id);

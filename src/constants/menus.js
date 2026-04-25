@@ -11,6 +11,7 @@ const MENUS = {
     back: '⬅️ Ortga',
     yes: '✅ Ha',
     no: '❌ Yo\'q',
+    location: '📍 Manzilimiz',
     changeLang: '🌐 Tilni o\'zgartirish',
   },
   ru: {
@@ -22,6 +23,7 @@ const MENUS = {
     back: '⬅️ Назад',
     yes: '✅ Да',
     no: '❌ Нет',
+    location: '📍 Наш адрес',
     changeLang: '🌐 Сменить язык',
   }
 };

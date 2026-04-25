@@ -13,8 +13,8 @@ function getMainKeyboard(lang = 'uz') {
   const m = MENUS[lang] || MENUS.uz;
   return Markup.keyboard([
     [m.doctors, m.connect],
-    [m.booking, m.help],
-    [m.changeLang]
+    [m.booking, m.location],
+    [m.help, m.changeLang]
   ]).resize();
 }
 
@@ -23,7 +23,7 @@ function getConfirmKeyboard(lang = 'uz') {
   return Markup.keyboard([
     [m.yes, m.no],
     [m.doctors, m.booking],
-    [m.help]
+    [m.location, m.help]
   ]).resize();
 }
 
@@ -32,7 +32,7 @@ function getChatKeyboard(lang = 'uz') {
   return Markup.keyboard([
     [m.finish],
     [m.doctors, m.booking],
-    [m.help]
+    [m.location, m.help]
   ]).resize();
 }
 
@@ -75,6 +75,13 @@ function getBookingSlotButtons(doctorKey, doctorSchedules, lang = 'uz') {
   return Markup.inlineKeyboard(rows);
 }
 
+function getLocationKeyboard(lang = 'uz') {
+  const t = require('../constants/texts')[lang] || require('../constants/texts').uz;
+  return Markup.inlineKeyboard([
+    [{ text: t.openMap, url: 'https://www.google.com/maps/search/?api=1&query=Tashkent+Pediatric+Medical+Institute+Bogishamol+Street+223+Tashkent+Uzbekistan' }]
+  ]);
+}
+
 module.exports = {
   getLangKeyboard,
   getMainKeyboard,
@@ -83,4 +90,5 @@ module.exports = {
   getDoctorButtons,
   getDoctorActionButtons,
   getBookingSlotButtons,
+  getLocationKeyboard,
 };

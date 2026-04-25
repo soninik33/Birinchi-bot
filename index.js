@@ -8,9 +8,9 @@ const MENUS = require('./src/constants/menus');
 const TEXTS = require('./src/constants/texts');
 const { DOCTOR_DATA } = require('./src/constants/doctors');
 const { loadConfig, saveConfig } = require('./src/utils/config');
-const { 
-  buildDoctorCard, 
-  getUserFullName 
+const {
+  buildDoctorCard,
+  getUserFullName
 } = require('./src/utils/helpers');
 
 // Keyboards
@@ -35,7 +35,7 @@ const config = loadConfig();
 
 const BOT_TOKEN = process.env.BOT_TOKEN || config.botToken;
 if (!BOT_TOKEN) {
-  console.error('❌ BOT_TOKEN topilmadi! Iltimos, uni .env fayliga yoki bot-config.json ichiga yozing.');
+  console.error('8679972956:AAGYXhdlzh84_EzOc-1iVoY5HgmiGHPZj5Y');
   process.exit(1);
 }
 
@@ -158,7 +158,7 @@ bot.action(/lang_(.+)/, async (ctx) => {
   stats.lang = lang;
   persistConfig();
   await ctx.answerCbQuery();
-  await ctx.deleteMessage().catch(() => {});
+  await ctx.deleteMessage().catch(() => { });
   await handlers.sendWelcome(ctx);
 });
 
@@ -167,7 +167,7 @@ bot.action(/info_(.+)/, async (ctx) => {
   const doctorKey = ctx.match[1];
   const doctor = DOCTOR_DATA[doctorKey];
   if (!doctor) return ctx.answerCbQuery('Error!');
-  
+
   await ctx.answerCbQuery();
   await ctx.editMessageText(buildDoctorCard(doctor, doctorKey, config.doctorSchedules, lang), {
     parse_mode: 'HTML',

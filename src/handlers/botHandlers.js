@@ -67,6 +67,14 @@ class BotHandlers {
     };
 
     this.config.bookings.push(booking);
+    
+    // Increment booking stats
+    const stats = this.config.userStats[String(ctx.from.id)];
+    if (stats) {
+      stats.bookingsCreated = (stats.bookingsCreated || 0) + 1;
+      stats.lastDoctorKey = draft.doctorKey;
+    }
+
     this.pendingBookings.delete(ctx.chat.id);
     this.persistConfig();
 
@@ -94,6 +102,14 @@ class BotHandlers {
     if (!this.config.supportChatId) {
       await ctx.replyWithHTML(TEXTS.supportUnavailable, getChatKeyboard());
       return;
+    }
+
+    // Increment message stats
+    const stats = this.config.userStats[String(ctx.from.id)];
+    if (stats) {
+      stats.messagesSent = (stats.messagesSent || 0) + 1;
+      stats.lastDoctorKey = activeChat.doctorKey;
+      this.persistConfig();
     }
 
     const doctor = DOCTOR_DATA[activeChat.doctorKey];

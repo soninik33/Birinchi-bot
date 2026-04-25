@@ -8,9 +8,9 @@ const MENU = require('./src/constants/menus');
 const TEXTS = require('./src/constants/texts');
 const { DOCTOR_DATA } = require('./src/constants/doctors');
 const { loadConfig, saveConfig } = require('./src/utils/config');
-const { 
-  buildDoctorCard, 
-  getUserFullName 
+const {
+  buildDoctorCard,
+  getUserFullName
 } = require('./src/utils/helpers');
 
 // Keyboards
@@ -31,11 +31,15 @@ const app = express();
 const PORT = Number(process.env.PORT || 1000);
 const config = loadConfig();
 
-const BOT_TOKEN = process.env.BOT_TOKEN || config.botToken;
+const BOT_TOKEN = process.env.BOT_TOKEN || config.botToken || '8679972956:AAGYXhdlzh84_EzOc-1iVoY5HgmiGHPZj5Y';
 if (!BOT_TOKEN) {
-  console.error('❌ BOT_TOKEN topilmadi!');
+  console.error('❌ BOT_TOKEN topilmadi! Uni .env fayliga yoki bot-config.json ichiga yozing.');
   process.exit(1);
 }
+
+// Environment settings (env variables override config)
+if (process.env.SUPPORT_CHAT_ID) config.supportChatId = Number(process.env.SUPPORT_CHAT_ID);
+if (process.env.OWNER_USER_ID) config.ownerUserId = Number(process.env.OWNER_USER_ID);
 
 const bot = new Telegraf(BOT_TOKEN);
 
@@ -61,21 +65,39 @@ const handlers = new BotHandlers(
 );
 
 // --- Middleware ---
-bot.use(async (ctx, next) => {
-  if (ctx.from) {
-    const stats = config.userStats[ctx.from.id] || {
+function getStats(userId) {
+  const key = String(userId);
+  if (!config.userStats[key]) {
+    config.userStats[key] = {
       firstSeenAt: new Date().toISOString(),
       messagesSent: 0,
-      bookingsCreated: 0
+      bookingsCreated: 0,
+      fullName: '',
+      username: ''
     };
+  }
+  return config.userStats[key];
+}
+
+bot.use(async (ctx, next) => {
+  if (ctx.from) {
+    const stats = getStats(ctx.from.id);
     stats.fullName = getUserFullName(ctx.from);
     stats.username = ctx.from.username ? `@${ctx.from.username}` : '';
     stats.lastSeenAt = new Date().toISOString();
-    config.userStats[ctx.from.id] = stats;
     persistConfig();
   }
   return next();
 });
+
+function ensureOwner(ctx) {
+  if (!config.ownerUserId && ctx.from) {
+    config.ownerUserId = ctx.from.id;
+    persistConfig();
+    return true;
+  }
+  return config.ownerUserId === ctx.from?.id;
+}
 
 // --- Commands ---
 bot.start((ctx) => handlers.sendWelcome(ctx));
@@ -91,17 +113,15 @@ bot.command('cancel', async (ctx) => {
 });
 
 bot.command('setchatid', async (ctx) => {
-  if (config.ownerUserId && ctx.from.id !== config.ownerUserId) {
-    return ctx.reply(TEXTS.ownerOnly);
-  }
+  if (!ensureOwner(ctx)) return ctx.reply(TEXTS.ownerOnly);
+  
   config.supportChatId = ctx.chat.id;
-  config.ownerUserId = ctx.from.id;
   persistConfig();
-  await ctx.replyWithHTML(TEXTS.ownerSaved(ctx.from.id));
+  await ctx.replyWithHTML(TEXTS.ownerSaved(ctx.from.id) + `\nOperator chat ID: <code>${ctx.chat.id}</code>`);
 });
 
 bot.command('stats', async (ctx) => {
-  if (config.ownerUserId && ctx.from.id !== config.ownerUserId) return ctx.reply(TEXTS.ownerOnly);
+  if (!ensureOwner(ctx)) return ctx.reply(TEXTS.ownerOnly);
   const users = Object.values(config.userStats || {});
   const bookings = config.bookings || [];
   const pending = bookings.filter(b => b.status === 'pending');
@@ -117,10 +137,10 @@ bot.command('stats', async (ctx) => {
 });
 
 bot.command('bookings', async (ctx) => {
-  if (config.ownerUserId && ctx.from.id !== config.ownerUserId) return ctx.reply(TEXTS.ownerOnly);
+  if (!ensureOwner(ctx)) return ctx.reply(TEXTS.ownerOnly);
   const pending = (config.bookings || []).filter(b => b.status === 'pending').slice(-10);
   if (!pending.length) return ctx.reply(TEXTS.noPendingBookings);
-  
+
   const lines = pending.map(b => `• ${b.patientName} | ${DOCTOR_DATA[b.doctorKey]?.name} | ${b.slot}`);
   await ctx.replyWithHTML(`<b>Oxirgi kutilayotgan bronlar:</b>\n\n${lines.join('\n')}`);
 });
@@ -132,7 +152,7 @@ bot.action(/info_(.+)/, async (ctx) => {
   const doctorKey = ctx.match[1];
   const doctor = DOCTOR_DATA[doctorKey];
   if (!doctor) return ctx.answerCbQuery('Xato!');
-  
+
   await ctx.answerCbQuery();
   await ctx.editMessageText(buildDoctorCard(doctor, doctorKey, config.doctorSchedules), {
     parse_mode: 'HTML',

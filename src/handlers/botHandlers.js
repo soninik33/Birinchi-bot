@@ -6,7 +6,8 @@ const {
   getChatKeyboard,
   getDoctorButtons,
   getBookingSlotButtons,
-  getDoctorActionButtons
+  getDoctorActionButtons,
+  getLangKeyboard
 } = require('../bot/keyboards');
 const {
   getUserFullName,
@@ -27,26 +28,44 @@ class BotHandlers {
     this.persistConfig = persistConfig;
   }
 
+  getLang(ctx) {
+    const stats = this.config.userStats[String(ctx.from?.id)];
+    return stats?.lang || 'uz';
+  }
+
   async sendWelcome(ctx) {
+    const lang = this.getLang(ctx);
+    const t = TEXTS[lang] || TEXTS.uz;
+    
     this.activeSpecialistChats.delete(ctx.chat.id);
     this.pendingBookings.delete(ctx.chat.id);
     this.persistConfig();
     
-    await ctx.replyWithHTML(TEXTS.welcome, getMainKeyboard());
-    await ctx.replyWithHTML(TEXTS.emergency);
-    await ctx.replyWithHTML(TEXTS.askDoctor, getConfirmKeyboard());
+    await ctx.replyWithHTML(t.welcome, getMainKeyboard(lang));
+    await ctx.replyWithHTML(t.emergency);
+    await ctx.replyWithHTML(t.askDoctor, getConfirmKeyboard(lang));
+  }
+
+  async askLanguage(ctx) {
+    await ctx.reply('🌐 Tilni tanlang / Выберите язык:', getLangKeyboard());
   }
 
   async sendSpecialistList(ctx) {
-    await ctx.replyWithHTML(TEXTS.chooseSpecialist, getDoctorButtons());
+    const lang = this.getLang(ctx);
+    const t = TEXTS[lang] || TEXTS.uz;
+    await ctx.replyWithHTML(t.chooseSpecialist, getDoctorButtons('info', lang));
   }
 
   async sendBookingDoctorList(ctx) {
+    const lang = this.getLang(ctx);
+    const t = TEXTS[lang] || TEXTS.uz;
     this.pendingBookings.delete(ctx.chat.id);
-    await ctx.replyWithHTML(TEXTS.chooseBookingDoctor, getDoctorButtons('booking_doctor'));
+    await ctx.replyWithHTML(t.chooseBookingDoctor, getDoctorButtons('booking_doctor', lang));
   }
 
   async createBooking(ctx) {
+    const lang = this.getLang(ctx);
+    const t = TEXTS[lang] || TEXTS.uz;
     const draft = this.pendingBookings.get(ctx.chat.id);
     if (!draft || !draft.doctorKey || !draft.slot) return;
 
@@ -64,11 +83,11 @@ class BotHandlers {
       username: ctx.from.username ? `@${ctx.from.username}` : '',
       createdAt: new Date().toISOString(),
       status: 'pending',
+      lang: lang
     };
 
     this.config.bookings.push(booking);
     
-    // Increment booking stats
     const stats = this.config.userStats[String(ctx.from.id)];
     if (stats) {
       stats.bookingsCreated = (stats.bookingsCreated || 0) + 1;
@@ -81,7 +100,7 @@ class BotHandlers {
     if (this.config.supportChatId) {
       const sent = await this.bot.telegram.sendMessage(
         this.config.supportChatId,
-        buildBookingSupportText(booking),
+        buildBookingSupportText(booking, lang),
         { parse_mode: 'HTML' }
       );
       this.supportMessageTargets.set(sent.message_id, {
@@ -92,19 +111,19 @@ class BotHandlers {
       });
     }
 
-    await ctx.replyWithHTML(
-      TEXTS.bookingCreated(DOCTOR_DATA[booking.doctorKey].name, booking.slot),
-      getMainKeyboard()
-    );
+    const docName = (DOCTOR_DATA[booking.doctorKey][lang] || DOCTOR_DATA[booking.doctorKey].uz).name;
+    await ctx.replyWithHTML(t.bookingCreated(docName, booking.slot), getMainKeyboard(lang));
   }
 
   async forwardToSupport(ctx, activeChat) {
+    const lang = this.getLang(ctx);
+    const t = TEXTS[lang] || TEXTS.uz;
+
     if (!this.config.supportChatId) {
-      await ctx.replyWithHTML(TEXTS.supportUnavailable, getChatKeyboard());
+      await ctx.replyWithHTML(t.supportUnavailable, getChatKeyboard(lang));
       return;
     }
 
-    // Increment message stats
     const stats = this.config.userStats[String(ctx.from.id)];
     if (stats) {
       stats.messagesSent = (stats.messagesSent || 0) + 1;
@@ -112,13 +131,14 @@ class BotHandlers {
       this.persistConfig();
     }
 
-    const doctor = DOCTOR_DATA[activeChat.doctorKey];
+    const doctor = DOCTOR_DATA[activeChat.doctorKey][lang] || DOCTOR_DATA[activeChat.doctorKey].uz;
     const metaText = [
       `👨‍⚕️ <b>Mutaxassis:</b> ${doctor.name}`,
       `👤 <b>Foydalanuvchi:</b> ${getUserFullName(ctx.from)}`,
       `🆔 <b>User ID:</b> <code>${ctx.from.id}</code>`,
       `💬 <b>Chat ID:</b> <code>${ctx.chat.id}</code>`,
-      `📂 <b>Xabar turi:</b> ${getMessageTypeLabel(ctx.message)}`,
+      `📂 <b>Xabar turi:</b> ${getMessageTypeLabel(ctx.message, lang)}`,
+      `🌐 <b>Til:</b> ${lang.toUpperCase()}`,
       '',
       getMessagePreview(ctx.message),
     ].join('\n');
@@ -148,7 +168,7 @@ class BotHandlers {
       });
     }
 
-    await ctx.replyWithHTML(TEXTS.sentToSpecialist(doctor.name), getChatKeyboard());
+    await ctx.replyWithHTML(t.sentToSpecialist(doctor.name), getChatKeyboard(lang));
   }
 
   async handleSupportReply(ctx) {
@@ -163,10 +183,15 @@ class BotHandlers {
 
     if (!targetUserId) return false;
 
+    const stats = this.config.userStats[String(targetUserId)];
+    const lang = stats?.lang || 'uz';
+    const t = TEXTS[lang] || TEXTS.uz;
+
     const activeChat = this.activeSpecialistChats.get(targetUserId);
     const isBooking = mapped?.kind === 'booking';
-    const doctorName = DOCTOR_DATA[mapped?.doctorKey || activeChat?.doctorKey]?.name || 'Mutaxassis';
-    const keyboard = isBooking ? getMainKeyboard() : getChatKeyboard();
+    const docData = DOCTOR_DATA[mapped?.doctorKey || activeChat?.doctorKey];
+    const doctorName = (docData ? (docData[lang] || docData.uz).name : null) || (lang === 'uz' ? 'Mutaxassis' : 'Специалист');
+    const keyboard = isBooking ? getMainKeyboard(lang) : getChatKeyboard(lang);
 
     if (isBooking && mapped?.bookingId) {
       const booking = this.config.bookings.find(b => b.id === mapped.bookingId);
@@ -177,7 +202,7 @@ class BotHandlers {
       }
     }
 
-    const prefix = isBooking ? TEXTS.bookingReplyPrefix : TEXTS.specialistReplyPrefix(doctorName);
+    const prefix = isBooking ? t.bookingReplyPrefix : t.specialistReplyPrefix(doctorName);
     
     if (ctx.message.text) {
       await this.bot.telegram.sendMessage(
@@ -192,7 +217,7 @@ class BotHandlers {
       });
     }
 
-    await ctx.reply(`✅ Yuborildi -> ${targetUserId}`);
+    await ctx.reply(`✅ Yuborildi -> ${targetUserId} (${lang.toUpperCase()})`);
     return true;
   }
 }

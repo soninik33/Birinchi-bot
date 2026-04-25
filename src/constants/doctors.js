@@ -1,53 +1,102 @@
 /**
- * Doctor profiles and default schedules
+ * Doctor profiles and default schedules in multiple languages
  */
 const DOCTOR_DATA = {
   malika: {
-    name: 'Malika Alisherovna',
-    title: 'Bolalar nevrologi',
-    experience: '25+ yil',
-    summary: 'Nutq kechikishi, diqqat, uyqu va nevrologik rivojlanish masalalari.',
-    topics: [
-      'Nutq rivojlanishi kechikishi',
-      'Diqqat jamlash qiyinligi',
-      'Uyqu bezovtaligi',
-      'Bosh og\'riqlari',
-    ],
+    uz: {
+      name: 'Malika Alisherovna',
+      title: 'Bolalar nevrologi',
+      experience: '25+ yil',
+      summary: 'Nutq kechikishi, diqqat, uyqu va nevrologik rivojlanish masalalari.',
+      topics: ['Nutq rivojlanishi kechikishi', 'Diqqat jamlash qiyinligi', 'Uyqu bezovtaligi', 'Bosh og\'riqlari'],
+    },
+    ru: {
+      name: 'Малика Алишеровна',
+      title: 'Детский невролог',
+      experience: '25+ лет',
+      summary: 'Задержка речи, внимание, сон и вопросы неврологического развития.',
+      topics: ['Задержка речевого развития', 'Трудности с концентрацией', 'Беспокойство во сне', 'Головные боли'],
+    }
   },
   anvar: {
-    name: 'Anvar Hakimov',
-    title: 'Nevrolog-epileptolog',
-    experience: '15 yil',
-    summary: 'Tutqanoq, EEG, tiklar va hush bilan bog\'liq holatlar.',
-    topics: ['EEG tahlili', 'Tutqanoq', 'Tik va duduqlanish', 'Uyqudagi bezovtalik'],
+    uz: {
+      name: 'Anvar Hakimov',
+      title: 'Nevrolog-epileptolog',
+      experience: '15 yil',
+      summary: 'Tutqanoq, EEG, tiklar va hush bilan bog\'liq holatlar.',
+      topics: ['EEG tahlili', 'Tutqanoq', 'Tik va duduqlanish', 'Uyqudagi bezovtalik'],
+    },
+    ru: {
+      name: 'Анвар Хакимов',
+      title: 'Невролог-эпилептолог',
+      experience: '15 лет',
+      summary: 'Эпилепсия, ЭЭГ, тики и состояния, связанные с сознанием.',
+      topics: ['Анализ ЭЭГ', 'Эпилепсия', 'Тики и заикание', 'Беспокойство во сне'],
+    }
   },
   lola: {
-    name: 'Lola Kirimova',
-    title: 'LOR shifokor',
-    experience: '18 yil',
-    summary: 'Quloq, tomoq, burun bilan bog\'liq bolalar muammolari.',
-    topics: ['Adenoid', 'Otit', 'Sinusit', 'Tez-tez shamollash'],
+    uz: {
+      name: 'Lola Kirimova',
+      title: 'LOR shifokor',
+      experience: '18 yil',
+      summary: 'Quloq, tomoq, burun bilan bog\'liq bolalar muammolari.',
+      topics: ['Adenoid', 'Otit', 'Sinusit', 'Tez-tez shamollash'],
+    },
+    ru: {
+      name: 'Лола Киримова',
+      title: 'ЛОР врач',
+      experience: '18 лет',
+      summary: 'Проблемы с ушами, горлом и носом у детей.',
+      topics: ['Аденоиды', 'Отит', 'Синусит', 'Частые простуды'],
+    }
   },
   sanjar: {
-    name: 'Sanjar Yusupov',
-    title: 'Bolalar oftalmologi',
-    experience: '14 yil',
-    summary: 'Ko\'rish pasayishi, g\'ilaylik va ko\'z zo\'riqishi.',
-    topics: ['Miopiya', 'G\'ilaylik', 'Ambliopiya', 'Ekrandan ko\'z charchashi'],
+    uz: {
+      name: 'Sanjar Yusupov',
+      title: 'Bolalar oftalmologi',
+      experience: '14 yil',
+      summary: 'Ko\'rish pasayishi, g\'ilaylik va ko\'z zo\'riqishi.',
+      topics: ['Miopiya', 'G\'ilaylik', 'Ambliopiya', 'Усталость глаз от экранов'],
+    },
+    ru: {
+      name: 'Санжар Юсупов',
+      title: 'Детский офтальмолог',
+      experience: '14 лет',
+      summary: 'Снижение зрения, косоглазие и напряжение глаз.',
+      topics: ['Миопия', 'Косоглазие', 'Амблиопия', 'Усталость глаз от экранов'],
+    }
   },
   nargiza: {
-    name: 'Nargiza Saidova',
-    title: 'Pediatr-dietolog',
-    experience: '12 yil',
-    summary: 'Ovqatlanish, vazn nazorati va hazm bilan bog\'liq masalalar.',
-    topics: ['Allergiya', 'Vazn nazorati', 'Ishtaha pasayishi', 'Ovqatlanish rejimi'],
+    uz: {
+      name: 'Nargiza Saidova',
+      title: 'Pediatr-dietolog',
+      experience: '12 yil',
+      summary: 'Ovqatlanish, vazn nazorati va hazm bilan bog\'liq masalalar.',
+      topics: ['Allergiya', 'Vazn nazorati', 'Ishtaha pasayishi', 'Ovqatlanish rejimi'],
+    },
+    ru: {
+      name: 'Наргиза Саидова',
+      title: 'Педиатр-диетолог',
+      experience: '12 лет',
+      summary: 'Питание, контроль веса и вопросы пищеварения.',
+      topics: ['Аллергия', 'Контроль веса', 'Снижение аппетита', 'Режим питания'],
+    }
   },
   dilshod: {
-    name: 'Dilshod Rahmonov',
-    title: 'Bolalar xirurgi',
-    experience: '20 yil',
-    summary: 'Churra, yumshoq to\'qima va kichik xirurgik ko\'riklar.',
-    topics: ['Kindik churrasi', 'Shish yoki bo\'rtma', 'Jarrohlik ko\'rigi', 'Tug\'ma holatlar'],
+    uz: {
+      name: 'Dilshod Rahmonov',
+      title: 'Bolalar xirurgi',
+      experience: '20 yil',
+      summary: 'Churra, yumshoq to\'qima va kichik xirurgik ko\'riklar.',
+      topics: ['Kindik churrasi', 'Shish yoki bo\'rtma', 'Jarrohlik ko\'rigi', 'Tug\'ma holatlar'],
+    },
+    ru: {
+      name: 'Дилшод Рахмонов',
+      title: 'Детский хирург',
+      experience: '20 лет',
+      summary: 'Грыжи, мягкие ткани и малые хирургические осмотры.',
+      topics: ['Пупочная грыжа', 'Отеки или припухлости', 'Хирургический осмотр', 'Врожденные состояния'],
+    }
   },
 };
 

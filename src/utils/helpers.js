@@ -5,50 +5,62 @@ function getUserFullName(from) {
   return [from.first_name, from.last_name].filter(Boolean).join(' ') || 'Foydalanuvchi';
 }
 
-function getMessageTypeLabel(message) {
-  if (message.text) return 'Matn';
-  if (message.photo) return 'Rasm';
-  if (message.video) return 'Video';
-  if (message.voice) return 'Ovozli xabar';
-  if (message.audio) return 'Audio';
-  if (message.document) return 'Hujjat';
-  if (message.sticker) return 'Stiker';
-  if (message.contact) return 'Kontakt';
-  if (message.location) return 'Lokatsiya';
-  return 'Xabar';
+function getMessageTypeLabel(message, lang = 'uz') {
+  const labels = {
+    uz: { text: 'Matn', photo: 'Rasm', video: 'Video', voice: 'Ovozli xabar', audio: 'Audio', doc: 'Hujjat', sticker: 'Stiker', contact: 'Kontakt', loc: 'Lokatsiya', msg: 'Xabar' },
+    ru: { text: 'Текст', photo: 'Фото', video: 'Видео', voice: 'Голосовое', audio: 'Аудио', doc: 'Документ', sticker: 'Стикер', contact: 'Контакт', loc: 'Локация', msg: 'Сообщение' }
+  };
+  const l = labels[lang] || labels.uz;
+  if (message.text) return l.text;
+  if (message.photo) return l.photo;
+  if (message.video) return l.video;
+  if (message.voice) return l.voice;
+  if (message.audio) return l.audio;
+  if (message.document) return l.doc;
+  if (message.sticker) return l.sticker;
+  if (message.contact) return l.contact;
+  if (message.location) return l.loc;
+  return l.msg;
 }
 
 function getMessagePreview(message) {
   const source = message.text || message.caption || '';
-  if (!source) return '[Media xabari]';
+  if (!source) return '[Media]';
   return source.length > 500 ? `${source.slice(0, 500)}...` : source;
 }
 
-function buildDoctorCard(doctor, doctorKey, doctorSchedules) {
-  const topics = doctor.topics.map((topic) => `• ${topic}`).join('\n');
+function buildDoctorCard(doctor, doctorKey, doctorSchedules, lang = 'uz') {
+  const data = doctor[lang] || doctor.uz;
+  const topics = data.topics.map((topic) => `• ${topic}`).join('\n');
   const schedule = (doctorSchedules[doctorKey] || [])
     .map((item) => `🕒 ${item}`)
     .join('\n');
 
+  const labels = {
+    uz: { exp: 'Tajriba', info: 'Ma\'lumot', topics: 'Asosiy yo\'nalishlar', slots: 'Bo\'sh vaqtlar', update: 'Yaqin orada yangilanadi' },
+    ru: { exp: 'Опыт', info: 'Информация', topics: 'Основные направления', slots: 'Свободное время', update: 'Скоро обновится' }
+  };
+  const l = labels[lang] || labels.uz;
+
   return [
-    `<b>👨‍⚕️ ${doctor.name}</b>`,
-    `<i>${doctor.title}</i>`,
+    `<b>👨‍⚕️ ${data.name}</b>`,
+    `<i>${data.title}</i>`,
     '',
-    `<b>🏆 Tajriba:</b> ${doctor.experience}`,
-    `<b>📝 Ma'lumot:</b> ${doctor.summary}`,
+    `<b>🏆 ${l.exp}:</b> ${data.experience}`,
+    `<b>📝 ${l.info}:</b> ${data.summary}`,
     '',
-    `<b>📋 Asosiy yo'nalishlar:</b>`,
+    `<b>📋 ${l.topics}:</b>`,
     topics,
     '',
-    `<b>📅 Bo'sh vaqtlar:</b>`,
-    schedule || '<i>Yaqin orada yangilanadi</i>',
+    `<b>📅 ${l.slots}:</b>`,
+    schedule || `<i>${l.update}</i>`,
   ].join('\n');
 }
 
-function buildBookingSupportText(booking) {
-  const doctor = DOCTOR_DATA[booking.doctorKey];
+function buildBookingSupportText(booking, lang = 'uz') {
+  const doctor = DOCTOR_DATA[booking.doctorKey][lang] || DOCTOR_DATA[booking.doctorKey].uz;
   return [
-    '🆕 <b>Yangi bron so\'rovi</b>',
+    '🆕 <b>Yangi bron so\'rovi / Новый запрос</b>',
     '',
     `<b>👨‍⚕️ Mutaxassis:</b> ${doctor.name}`,
     `<b>🕒 Slot:</b> ${booking.slot}`,
@@ -58,9 +70,8 @@ function buildBookingSupportText(booking) {
     `<b>📝 Muammo:</b> ${booking.complaint}`,
     '',
     `<b>👤 Kimdan:</b> ${booking.userFullName}`,
-    `<b>🔗 Username:</b> ${booking.username || 'yo\'q'}`,
     `<b>🆔 User ID:</b> <code>${booking.userId}</code>`,
-    `<b>💬 Chat ID:</b> <code>${booking.chatId}</code>`,
+    `<b>🌐 Til:</b> ${lang.toUpperCase()}`,
   ].join('\n');
 }
 

@@ -4,13 +4,13 @@ const express = require('express');
 const path = require('path');
 
 // Constants & Utils
-const MENU = require('./src/constants/menus');
+const MENUS = require('./src/constants/menus');
 const TEXTS = require('./src/constants/texts');
 const { DOCTOR_DATA } = require('./src/constants/doctors');
 const { loadConfig, saveConfig } = require('./src/utils/config');
-const {
-  buildDoctorCard,
-  getUserFullName
+const { 
+  buildDoctorCard, 
+  getUserFullName 
 } = require('./src/utils/helpers');
 
 // Keyboards
@@ -20,7 +20,8 @@ const {
   getChatKeyboard,
   getDoctorButtons,
   getDoctorActionButtons,
-  getBookingSlotButtons
+  getBookingSlotButtons,
+  getLangKeyboard
 } = require('./src/bot/keyboards');
 
 // Handlers
@@ -33,11 +34,11 @@ const config = loadConfig();
 
 const BOT_TOKEN = process.env.BOT_TOKEN || config.botToken || '8679972956:AAGYXhdlzh84_EzOc-1iVoY5HgmiGHPZj5Y';
 if (!BOT_TOKEN) {
-  console.error('❌ BOT_TOKEN topilmadi! Uni .env fayliga yoki bot-config.json ichiga yozing.');
+  console.error('❌ BOT_TOKEN topilmadi!');
   process.exit(1);
 }
 
-// Environment settings (env variables override config)
+// Environment settings
 if (process.env.SUPPORT_CHAT_ID) config.supportChatId = Number(process.env.SUPPORT_CHAT_ID);
 if (process.env.OWNER_USER_ID) config.ownerUserId = Number(process.env.OWNER_USER_ID);
 
@@ -73,7 +74,8 @@ function getStats(userId) {
       messagesSent: 0,
       bookingsCreated: 0,
       fullName: '',
-      username: ''
+      username: '',
+      lang: null // Will be set on /start or language selection
     };
   }
   return config.userStats[key];
@@ -100,127 +102,140 @@ function ensureOwner(ctx) {
 }
 
 // --- Commands ---
-bot.start((ctx) => handlers.sendWelcome(ctx));
-bot.help((ctx) => ctx.replyWithHTML(TEXTS.help, getMainKeyboard()));
+bot.start(async (ctx) => {
+  const stats = getStats(ctx.from.id);
+  if (!stats.lang) {
+    await handlers.askLanguage(ctx);
+  } else {
+    await handlers.sendWelcome(ctx);
+  }
+});
+
+bot.help((ctx) => {
+  const lang = handlers.getLang(ctx);
+  ctx.replyWithHTML(TEXTS[lang].help, getMainKeyboard(lang));
+});
+
 bot.command('doctors', (ctx) => handlers.sendSpecialistList(ctx));
 bot.command('book', (ctx) => handlers.sendBookingDoctorList(ctx));
 bot.command('myid', (ctx) => ctx.reply(`Sizning ID: ${ctx.from.id}`));
 bot.command('cancel', async (ctx) => {
+  const lang = handlers.getLang(ctx);
   activeSpecialistChats.delete(ctx.chat.id);
   pendingBookings.delete(ctx.chat.id);
   persistConfig();
-  await ctx.replyWithHTML(`${TEXTS.chatClosed}\n${TEXTS.bookingCancelled}`, getMainKeyboard());
+  await ctx.replyWithHTML(`${TEXTS[lang].chatClosed}\n${TEXTS[lang].bookingCancelled}`, getMainKeyboard(lang));
 });
 
 bot.command('setchatid', async (ctx) => {
-  if (!ensureOwner(ctx)) return ctx.reply(TEXTS.ownerOnly);
-  
+  if (!ensureOwner(ctx)) return ctx.reply(TEXTS.uz.ownerOnly);
   config.supportChatId = ctx.chat.id;
   persistConfig();
-  await ctx.replyWithHTML(TEXTS.ownerSaved(ctx.from.id) + `\nOperator chat ID: <code>${ctx.chat.id}</code>`);
+  await ctx.replyWithHTML(TEXTS.uz.ownerSaved(ctx.from.id) + `\nChat ID: <code>${ctx.chat.id}</code>`);
 });
 
 bot.command('stats', async (ctx) => {
-  if (!ensureOwner(ctx)) return ctx.reply(TEXTS.ownerOnly);
+  if (!ensureOwner(ctx)) return ctx.reply(TEXTS.uz.ownerOnly);
   const users = Object.values(config.userStats || {});
-  const bookings = config.bookings || [];
-  const pending = bookings.filter(b => b.status === 'pending');
   const stats = [
     `📊 <b>Bot Statistikasi:</b>`,
     `👥 Jami foydalanuvchilar: ${users.length}`,
-    `📅 Jami bronlar: ${bookings.length}`,
-    `⏳ Pending bronlar: ${pending.length}`,
-    `💬 Aktiv chatlar: ${activeSpecialistChats.size}`,
-    `🏢 Support Chat ID: <code>${config.supportChatId || 'ulanmagan'}</code>`
+    `📅 Jami bronlar: ${(config.bookings || []).length}`,
+    `💬 Aktiv chatlar: ${activeSpecialistChats.size}`
   ].join('\n');
   await ctx.replyWithHTML(stats);
 });
 
-bot.command('bookings', async (ctx) => {
-  if (!ensureOwner(ctx)) return ctx.reply(TEXTS.ownerOnly);
-  const pending = (config.bookings || []).filter(b => b.status === 'pending').slice(-10);
-  if (!pending.length) return ctx.reply(TEXTS.noPendingBookings);
-
-  const lines = pending.map(b => `• ${b.patientName} | ${DOCTOR_DATA[b.doctorKey]?.name} | ${b.slot}`);
-  await ctx.replyWithHTML(`<b>Oxirgi kutilayotgan bronlar:</b>\n\n${lines.join('\n')}`);
+// --- Actions ---
+bot.action(/lang_(.+)/, async (ctx) => {
+  const lang = ctx.match[1];
+  const stats = getStats(ctx.from.id);
+  stats.lang = lang;
+  persistConfig();
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage().catch(() => {});
+  await handlers.sendWelcome(ctx);
 });
 
-bot.command('chatid', (ctx) => ctx.reply(`Chat ID: ${ctx.chat.id}`));
-
-// --- Actions ---
 bot.action(/info_(.+)/, async (ctx) => {
+  const lang = handlers.getLang(ctx);
   const doctorKey = ctx.match[1];
   const doctor = DOCTOR_DATA[doctorKey];
-  if (!doctor) return ctx.answerCbQuery('Xato!');
-
+  if (!doctor) return ctx.answerCbQuery('Error!');
+  
   await ctx.answerCbQuery();
-  await ctx.editMessageText(buildDoctorCard(doctor, doctorKey, config.doctorSchedules), {
+  await ctx.editMessageText(buildDoctorCard(doctor, doctorKey, config.doctorSchedules, lang), {
     parse_mode: 'HTML',
-    ...getDoctorActionButtons(doctorKey),
+    ...getDoctorActionButtons(doctorKey, lang),
   });
 });
 
 bot.action(/booking_doctor_(.+)/, async (ctx) => {
+  const lang = handlers.getLang(ctx);
   const doctorKey = ctx.match[1];
-  if (!DOCTOR_DATA[doctorKey]) return ctx.answerCbQuery('Xato!');
+  if (!DOCTOR_DATA[doctorKey]) return ctx.answerCbQuery('Error!');
 
   pendingBookings.set(ctx.chat.id, { step: 'slot', doctorKey });
-  await ctx.answerCbQuery('Vaqtni tanlang');
+  await ctx.answerCbQuery();
+  const docName = (DOCTOR_DATA[doctorKey][lang] || DOCTOR_DATA[doctorKey].uz).name;
   await ctx.editMessageText(
-    `<b>${DOCTOR_DATA[doctorKey].name}</b> uchun qulay vaqtni tanlang:`,
+    `<b>${docName}</b> ${lang === 'uz' ? 'uchun qulay vaqtni tanlang:' : 'выберите удобное время:'}`,
     {
       parse_mode: 'HTML',
-      ...getBookingSlotButtons(doctorKey, config.doctorSchedules)
+      ...getBookingSlotButtons(doctorKey, config.doctorSchedules, lang)
     }
   );
 });
 
 bot.action(/booking_slot_(.+)_(\d+)/, async (ctx) => {
+  const lang = handlers.getLang(ctx);
+  const t = TEXTS[lang] || TEXTS.uz;
   const doctorKey = ctx.match[1];
   const slotIndex = Number(ctx.match[2]);
   const slot = (config.doctorSchedules[doctorKey] || [])[slotIndex];
 
-  if (!slot) return ctx.answerCbQuery('Vaqt topilmadi');
+  if (!slot) return ctx.answerCbQuery('Error!');
 
-  pendingBookings.set(ctx.chat.id, {
-    step: 'patient_name',
-    doctorKey,
-    slot,
-  });
+  pendingBookings.set(ctx.chat.id, { step: 'patient_name', doctorKey, slot });
 
   await ctx.answerCbQuery();
+  const docName = (DOCTOR_DATA[doctorKey][lang] || DOCTOR_DATA[doctorKey].uz).name;
   await ctx.replyWithHTML(
-    `✅ <b>${DOCTOR_DATA[doctorKey].name}</b> uchun <b>${slot}</b> tanlandi.\n\n${TEXTS.askPatientName}`,
+    `✅ <b>${docName}</b> (${slot}) ${lang === 'uz' ? 'tanlandi' : 'выбрано'}.\n\n${t.askPatientName}`,
     Markup.removeKeyboard()
   );
 });
 
 bot.action(/start_chat_(.+)/, async (ctx) => {
+  const lang = handlers.getLang(ctx);
   const doctorKey = ctx.match[1];
-  if (!DOCTOR_DATA[doctorKey]) return ctx.answerCbQuery('Xato!');
+  if (!DOCTOR_DATA[doctorKey]) return ctx.answerCbQuery('Error!');
 
   pendingBookings.delete(ctx.chat.id);
   activeSpecialistChats.set(ctx.chat.id, { doctorKey, startedAt: new Date().toISOString() });
   persistConfig();
 
-  await ctx.answerCbQuery('Chat boshlandi');
-  await ctx.replyWithHTML(TEXTS.chatStarted(DOCTOR_DATA[doctorKey].name), getChatKeyboard());
+  await ctx.answerCbQuery();
+  const docName = (DOCTOR_DATA[doctorKey][lang] || DOCTOR_DATA[doctorKey].uz).name;
+  await ctx.replyWithHTML(TEXTS[lang].chatStarted(docName), getChatKeyboard(lang));
 });
 
 bot.action('back_to_list', async (ctx) => {
+  const lang = handlers.getLang(ctx);
   await ctx.answerCbQuery();
-  await ctx.editMessageText(TEXTS.chooseSpecialist, {
+  await ctx.editMessageText(TEXTS[lang].chooseSpecialist, {
     parse_mode: 'HTML',
-    ...getDoctorButtons()
+    ...getDoctorButtons('info', lang)
   });
 });
 
 bot.action('back_to_booking_doctors', async (ctx) => {
+  const lang = handlers.getLang(ctx);
   pendingBookings.delete(ctx.chat.id);
   await ctx.answerCbQuery();
-  await ctx.editMessageText(TEXTS.chooseBookingDoctor, {
+  await ctx.editMessageText(TEXTS[lang].chooseBookingDoctor, {
     parse_mode: 'HTML',
-    ...getDoctorButtons('booking_doctor')
+    ...getDoctorButtons('booking_doctor', lang)
   });
 });
 
@@ -228,48 +243,50 @@ bot.action('back_to_booking_doctors', async (ctx) => {
 bot.on('text', async (ctx) => {
   if (await handlers.handleSupportReply(ctx)) return;
 
+  const lang = handlers.getLang(ctx);
+  const t = TEXTS[lang] || TEXTS.uz;
+  const m = MENUS[lang] || MENUS.uz;
   const text = (ctx.message.text || '').trim();
   const activeChat = activeSpecialistChats.get(ctx.chat.id);
   const booking = pendingBookings.get(ctx.chat.id);
 
   // Menu Handling
-  if (text === MENU.finish) {
+  if (text === m.finish) {
     activeSpecialistChats.delete(ctx.chat.id);
     persistConfig();
-    return ctx.replyWithHTML(TEXTS.chatClosed, getMainKeyboard());
+    return ctx.replyWithHTML(t.chatClosed, getMainKeyboard(lang));
   }
-  if (text === MENU.doctors) return handlers.sendSpecialistList(ctx);
-  if (text === MENU.booking) return handlers.sendBookingDoctorList(ctx);
-  if (text === MENU.help) return ctx.replyWithHTML(TEXTS.help, getMainKeyboard());
-  if (text === MENU.connect || text === MENU.yes) {
-    return ctx.replyWithHTML(TEXTS.chooseSpecialist, getDoctorButtons());
-  }
-  if (text === MENU.no || text === MENU.back) {
+  if (text === m.doctors) return handlers.sendSpecialistList(ctx);
+  if (text === m.booking) return handlers.sendBookingDoctorList(ctx);
+  if (text === m.help) return ctx.replyWithHTML(t.help, getMainKeyboard(lang));
+  if (text === m.changeLang) return handlers.askLanguage(ctx);
+  if (text === m.connect || text === m.yes) return handlers.sendSpecialistList(ctx);
+  if (text === m.no || text === m.back) {
     activeSpecialistChats.delete(ctx.chat.id);
     pendingBookings.delete(ctx.chat.id);
     persistConfig();
-    return ctx.replyWithHTML(TEXTS.noDoctor, getMainKeyboard());
+    return ctx.replyWithHTML(t.noDoctor, getMainKeyboard(lang));
   }
 
-  // Booking Step Handling
+  // Booking Steps
   if (booking) {
     if (booking.step === 'patient_name') {
       booking.patientName = text;
       booking.step = 'patient_age';
-      return ctx.replyWithHTML(TEXTS.askPatientAge);
+      return ctx.replyWithHTML(t.askPatientAge);
     }
     if (booking.step === 'patient_age') {
-      if (!/^\d{1,2}$/.test(text)) return ctx.replyWithHTML(TEXTS.invalidAge);
+      if (!/^\d{1,3}$/.test(text)) return ctx.replyWithHTML(t.invalidAge);
       booking.patientAge = text;
       booking.step = 'phone';
-      return ctx.replyWithHTML(TEXTS.askPhone);
+      return ctx.replyWithHTML(t.askPhone);
     }
     if (booking.step === 'phone') {
       const cleanPhone = text.replace(/\s+/g, '');
-      if (!/^\+?\d{9,15}$/.test(cleanPhone)) return ctx.replyWithHTML(TEXTS.invalidPhone);
+      if (!/^\+?\d{9,15}$/.test(cleanPhone)) return ctx.replyWithHTML(t.invalidPhone);
       booking.phone = cleanPhone;
       booking.step = 'complaint';
-      return ctx.replyWithHTML(TEXTS.askComplaint);
+      return ctx.replyWithHTML(t.askComplaint);
     }
     if (booking.step === 'complaint') {
       booking.complaint = text;
@@ -277,45 +294,30 @@ bot.on('text', async (ctx) => {
     }
   }
 
-  // Active Chat Forwarding
-  if (activeChat) {
-    return handlers.forwardToSupport(ctx, activeChat);
-  }
+  if (activeChat) return handlers.forwardToSupport(ctx, activeChat);
 
-  // Default
-  await ctx.replyWithHTML(TEXTS.askDoctor, getConfirmKeyboard());
+  // Default fallback
+  await ctx.replyWithHTML(t.askDoctor, getConfirmKeyboard(lang));
 });
 
 bot.on(['photo', 'video', 'voice', 'audio', 'document', 'sticker'], async (ctx) => {
   if (await handlers.handleSupportReply(ctx)) return;
+  const lang = handlers.getLang(ctx);
   const activeChat = activeSpecialistChats.get(ctx.chat.id);
   if (!activeChat) {
-    return ctx.replyWithHTML('⚠️ Avval mutaxassisni tanlang.', getConfirmKeyboard());
+    const msg = lang === 'uz' ? '⚠️ Avval mutaxassisni tanlang.' : '⚠️ Сначала выберите специалиста.';
+    return ctx.replyWithHTML(msg, getConfirmKeyboard(lang));
   }
   await handlers.forwardToSupport(ctx, activeChat);
 });
 
 // --- Server ---
-app.get('/', (req, res) => {
-  res.json({
-    ok: true,
-    service: 'MedBot Server',
-    users: Object.keys(config.userStats || {}).length,
-    bookings: (config.bookings || []).length,
-    activeChats: activeSpecialistChats.size
-  });
-});
+app.get('/', (req, res) => res.json({ ok: true, active: activeSpecialistChats.size }));
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-
-// Heartbeat
-setInterval(() => {
-  console.log(`[${new Date().toISOString()}] Bot active. Chats: ${activeSpecialistChats.size}, Pending Bookings: ${(config.bookings || []).filter(b => b.status === 'pending').length}`);
-}, 300000);
 
 // --- Launch ---
 bot.catch((err) => console.error('❌ Bot Error:', err));
 bot.launch().then(() => console.log('✅ Bot started!'));
 
-// Graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));

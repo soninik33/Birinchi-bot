@@ -3,6 +3,14 @@ const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
 const path = require('path');
 
+process.on('unhandledRejection', (reason, promise) => {
+  console.warn('⚠️ Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err);
+});
+
 // Constants & Utils
 const MENUS = require('./src/constants/menus');
 const TEXTS = require('./src/constants/texts');
@@ -320,12 +328,63 @@ bot.on(['photo', 'video', 'voice', 'audio', 'document', 'sticker'], async (ctx) 
 });
 
 // --- Server ---
-app.get('/', (req, res) => res.json({ ok: true, active: activeSpecialistChats.size }));
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));
+app.get('/', (req, res) => res.json({ ok: true, status: 'running', activeChats: activeSpecialistChats.size }));
+app.get('/health', (req, res) => res.status(200).send('OK'));
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
 
 // --- Launch ---
-bot.catch((err) => console.error('❌ Bot Error:', err));
-bot.launch().then(() => console.log('✅ Bot started!'));
+bot.catch((err) => console.error('❌ Bot Update Error:', err));
 
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+let isLaunching = false;
+async function startBotWithRetry(retries = 12, delay = 5000) {
+  if (isLaunching) return;
+  isLaunching = true;
+
+  try {
+    console.log('🔄 Telegram webhook holati tekshirilmoqda...');
+    try {
+      await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+      console.log('🧹 Webhook va eski xabarlar tozalandi.');
+    } catch (whErr) {
+      console.warn('⚠️ Webhook tozalash xabari:', whErr.message);
+    }
+
+    await bot.launch({
+      dropPendingUpdates: true
+    });
+    console.log('✅ Bot muvaffaqiyatli ishga tushdi!');
+  } catch (err) {
+    isLaunching = false;
+    const isConflict = err?.response?.error_code === 409 ||
+      err?.message?.includes('409') ||
+      err?.message?.includes('Conflict') ||
+      err?.message?.includes('terminated by other getUpdates');
+
+    if (isConflict && retries > 0) {
+      console.warn(`⚠️ 409 Conflict: Boshqa bot nusxasi ishlab turibdi (yoki Render avvalgi konteynerni to'xtatmoqda). ${delay / 1000}s dan keyin qayta ulanadi... (Qolgan urinishlar: ${retries})`);
+      setTimeout(() => startBotWithRetry(retries - 1, delay), delay);
+    } else {
+      console.error('❌ Botni ishga tushirishda xatolik:', err);
+      if (retries > 0) {
+        setTimeout(() => startBotWithRetry(retries - 1, 10000), 10000);
+      }
+    }
+  }
+}
+
+startBotWithRetry();
+
+const gracefulStop = (signal) => {
+  console.log(`To'xtatish signali: ${signal}`);
+  try {
+    bot.stop(signal);
+  } catch (e) {}
+  process.exit(0);
+};
+
+process.once('SIGINT', () => gracefulStop('SIGINT'));
+process.once('SIGTERM', () => gracefulStop('SIGTERM'));
+

@@ -389,6 +389,23 @@ app.get(['/receipt/:id', '/check/:id'], (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
+
+  // --- 24/7 Self-ping keepalive (Render free tier uxlab qolmasligi uchun) ---
+  const selfUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL;
+  if (selfUrl) {
+    const pingUrl = `${selfUrl.replace(/\/$/, '')}/health`;
+    setInterval(async () => {
+      try {
+        const res = await fetch(pingUrl);
+        console.log(`💓 Keepalive ping: ${res.status} (${pingUrl})`);
+      } catch (err) {
+        console.warn('⚠️ Keepalive ping muvaffaqiyatsiz:', err.message);
+      }
+    }, 13 * 60 * 1000); // Har 13 daqiqada bir marta
+    console.log(`💓 Keepalive yoqildi: ${pingUrl} (har 13 daqiqada)`);
+  } else {
+    console.log('ℹ️ Keepalive: BASE_URL yoki RENDER_EXTERNAL_URL aniqlanmadi, o\'chiriq.');
+  }
 });
 
 // --- Launch ---

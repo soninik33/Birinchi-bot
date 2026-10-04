@@ -131,7 +131,7 @@ class BotHandlers {
     const docName = docData.name;
     const docTitle = docData.title || '';
 
-    // Only set receiptUrl if user has a custom BASE_URL or Render provides RENDER_EXTERNAL_URL
+    // Only set receiptUrl if Render provides RENDER_EXTERNAL_URL or user set BASE_URL
     const baseUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL;
     const receiptUrl = baseUrl ? `${baseUrl.replace(/\/$/, '')}/receipt/${booking.id}` : null;
 
@@ -146,9 +146,12 @@ class BotHandlers {
       `📞 <b>Telefon:</b> ${booking.phone}`,
       `👨‍⚕️ <b>Shifokor:</b> ${docName} (${docTitle})`,
       `🕒 <b>Qabul vaqti:</b> <b>${booking.slot}</b>`,
-      '📍 <b>Manzil:</b> Toshkent sh., Bog\'ishamol ko\'chasi, 223-uy (SAMPI)',
+      '',
+      `📍 <b>Manzilimiz:</b> Toshkent sh., Bog'ishamol ko'chasi, 223-uy (SAMPI)`,
+      `🗺 <b>Xaritada:</b> maps.app.goo.gl/RNXcPe8LbMMAGgXB7`,
       '━━━━━━━━━━━━━━━━━━━━',
-      receiptUrl ? `🔗 <b>Chek havolasi:</b> <a href="${receiptUrl}">Chekni ko'rish (Web)</a>\n` : '',
+      receiptUrl ? `🔗 <b>Chek havolasi:</b> ${receiptUrl}` : '',
+      '',
       '<i>Qabulga kelganda ushbu chekni ko\'rsatishingiz mumkin.</i>'
     ].filter(Boolean).join('\n') : [
       '✅ <b>Вы успешно записались на прием!</b>',
@@ -161,23 +164,28 @@ class BotHandlers {
       `📞 <b>Телефон:</b> ${booking.phone}`,
       `👨‍⚕️ <b>Врач:</b> ${docName} (${docTitle})`,
       `🕒 <b>Время приема:</b> <b>${booking.slot}</b>`,
-      '📍 <b>Адрес:</b> г. Ташкент, ул. Богишамол, 223 (САМПИ)',
+      '',
+      '📍 <b>Наш адрес:</b> г. Ташкент, ул. Богишамол, 223 (САМПИ)',
+      `🗺 <b>На карте:</b> maps.app.goo.gl/RNXcPe8LbMMAGgXB7`,
       '━━━━━━━━━━━━━━━━━━━━',
-      receiptUrl ? `🔗 <b>Ссылка на чек:</b> <a href="${receiptUrl}">Открыть чек (Web)</a>\n` : '',
+      receiptUrl ? `🔗 <b>Ссылка на чек:</b> ${receiptUrl}` : '',
+      '',
       '<i>Вы можете показать этот чек при посещении клиники.</i>'
     ].filter(Boolean).join('\n');
 
     const inlineKeyboard = [];
     if (receiptUrl) {
-      inlineKeyboard.push([{ text: lang === 'uz' ? '🧾 Veb-chekni ochish (PDF)' : '🧾 Открыть веб-чек (PDF)', url: receiptUrl }]);
+      inlineKeyboard.push([{
+        text: lang === 'uz' ? '🧾 Chekni vebda ochish (PDF)' : '🧾 Открыть чек в браузере (PDF)',
+        url: receiptUrl
+      }]);
     }
-    inlineKeyboard.push([{ text: lang === 'uz' ? '📍 Shifoxona lokatsiyasi (Xarita)' : '📍 Локация клиники (Карта)', url: MAP_URL }]);
 
-    await ctx.replyWithHTML(receiptMsg, {
-      reply_markup: {
-        inline_keyboard: inlineKeyboard
-      }
-    });
+    const replyOpts = inlineKeyboard.length > 0
+      ? { reply_markup: { inline_keyboard: inlineKeyboard } }
+      : {};
+
+    await ctx.replyWithHTML(receiptMsg, replyOpts);
 
     await ctx.reply(lang === 'uz' ? 'Asosiy menyu:' : 'Главное меню:', getMainKeyboard(lang));
   }

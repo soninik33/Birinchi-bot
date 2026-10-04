@@ -59,8 +59,8 @@ function buildDoctorCard(doctor, doctorKey, doctorSchedules, lang = 'uz') {
 
 function buildBookingSupportText(booking, lang = 'uz') {
   const doctor = DOCTOR_DATA[booking.doctorKey][lang] || DOCTOR_DATA[booking.doctorKey].uz;
-  const baseUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://birinchi-bot.onrender.com';
-  const receiptUrl = `${baseUrl.replace(/\/$/, '')}/receipt/${booking.id}`;
+  const baseUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL;
+  const receiptUrl = baseUrl ? `${baseUrl.replace(/\/$/, '')}/receipt/${booking.id}` : null;
 
   return [
     '🆕 <b>Yangi bron so\'rovi / Новый запрос</b>',
@@ -71,14 +71,12 @@ function buildBookingSupportText(booking, lang = 'uz') {
     `<b>👤 Bemor (Ism-Familiya):</b> ${booking.patientName}`,
     `<b>🔢 Yoshi:</b> ${booking.patientAge}`,
     `<b>📞 Telefon:</b> ${booking.phone}`,
-    `<b>📝 Muammo:</b> ${booking.complaint}`,
-    '',
-    `<b>🔗 Elektron chek:</b> <a href="${receiptUrl}">Chekni ko'rish (Web)</a>`,
+    receiptUrl ? `\n<b>🔗 Elektron chek:</b> <a href="${receiptUrl}">Chekni ko'rish (Web)</a>` : '',
     '',
     `<b>👤 Kimdan:</b> ${booking.userFullName}`,
     `<b>🆔 User ID:</b> <code>${booking.userId}</code>`,
     `<b>🌐 Til:</b> ${lang.toUpperCase()}`,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 function extractChatIdFromSupportMessage(message) {

@@ -75,17 +75,17 @@ const handlers = new BotHandlers(
   persistConfig
 );
 
-// --- Middleware ---
-function getStats(userId) {
+function getStats(userId, ctx) {
   const key = String(userId);
   if (!config.userStats[key]) {
+    const isRu = ctx?.from?.language_code && ctx.from.language_code.toLowerCase().startsWith('ru');
     config.userStats[key] = {
       firstSeenAt: new Date().toISOString(),
       messagesSent: 0,
       bookingsCreated: 0,
       fullName: '',
       username: '',
-      lang: null // Will be set on /start or language selection
+      lang: isRu ? 'ru' : null
     };
   }
   return config.userStats[key];
@@ -93,10 +93,13 @@ function getStats(userId) {
 
 bot.use(async (ctx, next) => {
   if (ctx.from) {
-    const stats = getStats(ctx.from.id);
+    const stats = getStats(ctx.from.id, ctx);
     stats.fullName = getUserFullName(ctx.from);
     stats.username = ctx.from.username ? `@${ctx.from.username}` : '';
     stats.lastSeenAt = new Date().toISOString();
+    if (!stats.lang && ctx.from.language_code && ctx.from.language_code.toLowerCase().startsWith('ru')) {
+      stats.lang = 'ru';
+    }
     persistConfig();
   }
   return next();
@@ -113,7 +116,7 @@ function ensureOwner(ctx) {
 
 // --- Commands ---
 bot.start(async (ctx) => {
-  const stats = getStats(ctx.from.id);
+  const stats = getStats(ctx.from.id, ctx);
   if (!stats.lang) {
     await handlers.askLanguage(ctx);
   } else {
@@ -163,8 +166,14 @@ bot.command('stats', async (ctx) => {
 // --- Actions ---
 bot.action(/lang_(.+)/, async (ctx) => {
   const lang = ctx.match[1];
-  const stats = getStats(ctx.from.id);
+  const stats = getStats(ctx.from.id, ctx);
   stats.lang = lang;
+  if (ctx.chat) {
+    const chatStats = getStats(ctx.chat.id, ctx);
+    chatStats.lang = lang;
+    const pending = pendingBookings.get(ctx.chat.id);
+    if (pending) pending.lang = lang;
+  }
   persistConfig();
   await ctx.answerCbQuery();
   await ctx.deleteMessage().catch(() => { });
@@ -189,7 +198,7 @@ bot.action(/booking_doctor_(.+)/, async (ctx) => {
   const doctorKey = ctx.match[1];
   if (!DOCTOR_DATA[doctorKey]) return ctx.answerCbQuery('Error!');
 
-  pendingBookings.set(ctx.chat.id, { step: 'slot', doctorKey });
+  pendingBookings.set(ctx.chat.id, { step: 'slot', doctorKey, lang });
   await ctx.answerCbQuery();
   const docName = (DOCTOR_DATA[doctorKey][lang] || DOCTOR_DATA[doctorKey].uz).name;
   await ctx.editMessageText(
@@ -202,15 +211,17 @@ bot.action(/booking_doctor_(.+)/, async (ctx) => {
 });
 
 bot.action(/booking_slot_(.+)_(\d+)/, async (ctx) => {
-  const lang = handlers.getLang(ctx);
-  const t = TEXTS[lang] || TEXTS.uz;
   const doctorKey = ctx.match[1];
   const slotIndex = Number(ctx.match[2]);
   const slot = (config.doctorSchedules[doctorKey] || [])[slotIndex];
 
   if (!slot) return ctx.answerCbQuery('Error!');
 
-  pendingBookings.set(ctx.chat.id, { step: 'patient_name', doctorKey, slot });
+  const prev = pendingBookings.get(ctx.chat.id) || {};
+  const lang = prev.lang || handlers.getLang(ctx);
+  const t = TEXTS[lang] || TEXTS.uz;
+
+  pendingBookings.set(ctx.chat.id, { ...prev, step: 'patient_name', doctorKey, slot, lang });
 
   await ctx.answerCbQuery();
   const docName = (DOCTOR_DATA[doctorKey][lang] || DOCTOR_DATA[doctorKey].uz).name;
@@ -257,28 +268,47 @@ bot.action('back_to_booking_doctors', async (ctx) => {
 bot.on('text', async (ctx) => {
   if (await handlers.handleSupportReply(ctx)) return;
 
-  const lang = handlers.getLang(ctx);
-  const t = TEXTS[lang] || TEXTS.uz;
-  const m = MENUS[lang] || MENUS.uz;
   const text = (ctx.message.text || '').trim();
-  const activeChat = activeSpecialistChats.get(ctx.chat.id);
   const booking = pendingBookings.get(ctx.chat.id);
 
-  // Menu Handling
-  if (text === m.finish) {
+  // Check language from clicked menu buttons
+  const isRuMenu = Object.values(MENUS.ru).includes(text);
+  const isUzMenu = Object.values(MENUS.uz).includes(text);
+
+  let lang = booking?.lang || handlers.getLang(ctx);
+  if (isRuMenu) {
+    lang = 'ru';
+    const stats = getStats(ctx.from.id, ctx);
+    stats.lang = 'ru';
+    persistConfig();
+  } else if (isUzMenu) {
+    lang = 'uz';
+    const stats = getStats(ctx.from.id, ctx);
+    stats.lang = 'uz';
+    persistConfig();
+  }
+
+  const t = TEXTS[lang] || TEXTS.uz;
+  const activeChat = activeSpecialistChats.get(ctx.chat.id);
+
+  // Menu Handling (supports both uz and ru buttons)
+  if (text === MENUS.uz.finish || text === MENUS.ru.finish) {
     activeSpecialistChats.delete(ctx.chat.id);
+    pendingBookings.delete(ctx.chat.id);
     persistConfig();
     return ctx.replyWithHTML(t.chatClosed, getMainKeyboard(lang));
   }
-  if (text === m.doctors) return handlers.sendSpecialistList(ctx);
-  if (text === m.booking) return handlers.sendBookingDoctorList(ctx);
-  if (text === m.help) return ctx.replyWithHTML(t.help, getMainKeyboard(lang));
-  if (text === m.changeLang) return handlers.askLanguage(ctx);
-  if (text === m.location) {
+  if (text === MENUS.uz.doctors || text === MENUS.ru.doctors) return handlers.sendSpecialistList(ctx);
+  if (text === MENUS.uz.booking || text === MENUS.ru.booking) return handlers.sendBookingDoctorList(ctx);
+  if (text === MENUS.uz.help || text === MENUS.ru.help) return ctx.replyWithHTML(t.help, getMainKeyboard(lang));
+  if (text === MENUS.uz.changeLang || text === MENUS.ru.changeLang) return handlers.askLanguage(ctx);
+  if (text === MENUS.uz.location || text === MENUS.ru.location) {
     return ctx.replyWithHTML(t.locationInfo, getLocationKeyboard(lang));
   }
-  if (text === m.connect || text === m.yes) return handlers.sendSpecialistList(ctx);
-  if (text === m.no || text === m.back) {
+  if (text === MENUS.uz.connect || text === MENUS.ru.connect || text === MENUS.uz.yes || text === MENUS.ru.yes) {
+    return handlers.sendSpecialistList(ctx);
+  }
+  if (text === MENUS.uz.no || text === MENUS.ru.no || text === MENUS.uz.back || text === MENUS.ru.back) {
     activeSpecialistChats.delete(ctx.chat.id);
     pendingBookings.delete(ctx.chat.id);
     persistConfig();
@@ -287,26 +317,25 @@ bot.on('text', async (ctx) => {
 
   // Booking Steps
   if (booking) {
+    booking.lang = booking.lang || lang;
+    const bLang = booking.lang;
+    const bt = TEXTS[bLang] || TEXTS.uz;
+
     if (booking.step === 'patient_name') {
       booking.patientName = text;
       booking.step = 'patient_age';
-      return ctx.replyWithHTML(t.askPatientAge);
+      return ctx.replyWithHTML(bt.askPatientAge);
     }
     if (booking.step === 'patient_age') {
-      if (!/^\d{1,3}$/.test(text)) return ctx.replyWithHTML(t.invalidAge);
+      if (!/^\d{1,3}$/.test(text)) return ctx.replyWithHTML(bt.invalidAge);
       booking.patientAge = text;
       booking.step = 'phone';
-      return ctx.replyWithHTML(t.askPhone);
+      return ctx.replyWithHTML(bt.askPhone);
     }
     if (booking.step === 'phone') {
-      const cleanPhone = text.replace(/\s+/g, '');
-      if (!/^\+?\d{9,15}$/.test(cleanPhone)) return ctx.replyWithHTML(t.invalidPhone);
+      const cleanPhone = text.replace(/[\s\-\(\)]/g, '');
+      if (!/^\+?\d{7,15}$/.test(cleanPhone)) return ctx.replyWithHTML(bt.invalidPhone);
       booking.phone = cleanPhone;
-      booking.step = 'complaint';
-      return ctx.replyWithHTML(t.askComplaint);
-    }
-    if (booking.step === 'complaint') {
-      booking.complaint = text;
       return handlers.createBooking(ctx);
     }
   }
@@ -315,6 +344,15 @@ bot.on('text', async (ctx) => {
 
   // Default fallback
   await ctx.replyWithHTML(t.askDoctor, getConfirmKeyboard(lang));
+});
+
+bot.on('contact', async (ctx) => {
+  if (await handlers.handleSupportReply(ctx)) return;
+  const booking = pendingBookings.get(ctx.chat.id);
+  if (booking && booking.step === 'phone' && ctx.message?.contact?.phone_number) {
+    booking.phone = ctx.message.contact.phone_number;
+    return handlers.createBooking(ctx);
+  }
 });
 
 bot.on(['photo', 'video', 'voice', 'audio', 'document', 'sticker'], async (ctx) => {

@@ -30,8 +30,23 @@ class BotHandlers {
   }
 
   getLang(ctx) {
-    const stats = this.config.userStats[String(ctx.from?.id)];
-    return stats?.lang || 'uz';
+    if (!ctx) return 'uz';
+    const chatId = ctx.chat?.id;
+    const userId = ctx.from?.id;
+
+    if (chatId && this.pendingBookings.has(chatId)) {
+      const draft = this.pendingBookings.get(chatId);
+      if (draft && draft.lang) return draft.lang;
+    }
+
+    const stats = (userId && this.config.userStats[String(userId)]) || (chatId && this.config.userStats[String(chatId)]);
+    if (stats?.lang) return stats.lang;
+
+    if (ctx.from?.language_code && ctx.from.language_code.toLowerCase().startsWith('ru')) {
+      return 'ru';
+    }
+
+    return 'uz';
   }
 
   async sendWelcome(ctx) {
@@ -65,9 +80,10 @@ class BotHandlers {
   }
 
   async createBooking(ctx) {
-    const lang = this.getLang(ctx);
     const draft = this.pendingBookings.get(ctx.chat.id);
     if (!draft || !draft.doctorKey || !draft.slot) return;
+
+    const lang = draft.lang || this.getLang(ctx);
 
     const booking = {
       id: `bk_${Date.now()}`,
@@ -77,10 +93,10 @@ class BotHandlers {
       patientAge: draft.patientAge,
       phone: draft.phone,
       complaint: draft.complaint || '',
-      userId: ctx.from.id,
+      userId: ctx.from?.id || ctx.chat.id,
       chatId: ctx.chat.id,
       userFullName: getUserFullName(ctx.from),
-      username: ctx.from.username ? `@${ctx.from.username}` : '',
+      username: ctx.from?.username ? `@${ctx.from.username}` : '',
       createdAt: new Date().toISOString(),
       status: 'pending',
       lang: lang
@@ -88,7 +104,7 @@ class BotHandlers {
 
     this.config.bookings.push(booking);
     
-    const stats = this.config.userStats[String(ctx.from.id)];
+    const stats = this.config.userStats[String(ctx.from?.id)];
     if (stats) {
       stats.bookingsCreated = (stats.bookingsCreated || 0) + 1;
       stats.lastDoctorKey = draft.doctorKey;
@@ -115,13 +131,14 @@ class BotHandlers {
     const docName = docData.name;
     const docTitle = docData.title || '';
 
-    const baseUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://birinchi-bot.onrender.com';
-    const receiptUrl = `${baseUrl.replace(/\/$/, '')}/receipt/${booking.id}`;
+    // Only set receiptUrl if user has a custom BASE_URL or Render provides RENDER_EXTERNAL_URL
+    const baseUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL;
+    const receiptUrl = baseUrl ? `${baseUrl.replace(/\/$/, '')}/receipt/${booking.id}` : null;
 
     const receiptMsg = lang === 'uz' ? [
       '✅ <b>Qabulga yozilish muvaffaqiyatli rasmiylashtirildi!</b>',
       '',
-      '🧾 <b>QABUL ELEKTRON CHEKI</b>',
+      '🧾 <b>ELEKTRON QABUL CHEKI</b>',
       '━━━━━━━━━━━━━━━━━━━━',
       `🆔 <b>Chek raqami:</b> <code>#${booking.id}</code>`,
       `👤 <b>Bemor (F.I.Sh):</b> <b>${booking.patientName}</b>`,
@@ -129,13 +146,10 @@ class BotHandlers {
       `📞 <b>Telefon:</b> ${booking.phone}`,
       `👨‍⚕️ <b>Shifokor:</b> ${docName} (${docTitle})`,
       `🕒 <b>Qabul vaqti:</b> <b>${booking.slot}</b>`,
-      booking.complaint ? `📝 <b>Shikoyat:</b> ${booking.complaint}` : null,
-      '📍 <b>Manzil:</b> Bog\'ishamol ko\'chasi, 223-uy (SAMPI)',
+      '📍 <b>Manzil:</b> Toshkent sh., Bog\'ishamol ko\'chasi, 223-uy (SAMPI)',
       '━━━━━━━━━━━━━━━━━━━━',
-      '🔗 <b>Sizning elektron chekingiz:</b>',
-      `👉 <a href="${receiptUrl}">${receiptUrl}</a>`,
-      '',
-      '<i>Chekni saqlash yoki qabulda ko\'rsatish uchun havolani bosing.</i>'
+      receiptUrl ? `🔗 <b>Chek havolasi:</b> <a href="${receiptUrl}">Chekni ko'rish (Web)</a>\n` : '',
+      '<i>Qabulga kelganda ushbu chekni ko\'rsatishingiz mumkin.</i>'
     ].filter(Boolean).join('\n') : [
       '✅ <b>Вы успешно записались на прием!</b>',
       '',
@@ -147,21 +161,21 @@ class BotHandlers {
       `📞 <b>Телефон:</b> ${booking.phone}`,
       `👨‍⚕️ <b>Врач:</b> ${docName} (${docTitle})`,
       `🕒 <b>Время приема:</b> <b>${booking.slot}</b>`,
-      booking.complaint ? `📝 <b>Жалоба:</b> ${booking.complaint}` : null,
-      '📍 <b>Адрес:</b> ул. Богишамол, 223 (САМПИ)',
+      '📍 <b>Адрес:</b> г. Ташкент, ул. Богишамол, 223 (САМПИ)',
       '━━━━━━━━━━━━━━━━━━━━',
-      '🔗 <b>Ссылка на электронный чек:</b>',
-      `👉 <a href="${receiptUrl}">${receiptUrl}</a>`,
-      '',
-      '<i>Нажмите на ссылку, чтобы открыть или распечатать чек.</i>'
+      receiptUrl ? `🔗 <b>Ссылка на чек:</b> <a href="${receiptUrl}">Открыть чек (Web)</a>\n` : '',
+      '<i>Вы можете показать этот чек при посещении клиники.</i>'
     ].filter(Boolean).join('\n');
+
+    const inlineKeyboard = [];
+    if (receiptUrl) {
+      inlineKeyboard.push([{ text: lang === 'uz' ? '🧾 Veb-chekni ochish (PDF)' : '🧾 Открыть веб-чек (PDF)', url: receiptUrl }]);
+    }
+    inlineKeyboard.push([{ text: lang === 'uz' ? '📍 Shifoxona lokatsiyasi (Xarita)' : '📍 Локация клиники (Карта)', url: MAP_URL }]);
 
     await ctx.replyWithHTML(receiptMsg, {
       reply_markup: {
-        inline_keyboard: [
-          [{ text: lang === 'uz' ? '🧾 Elektron chekni ochish' : '🧾 Открыть электронный чек', url: receiptUrl }],
-          [{ text: lang === 'uz' ? '📍 Shifoxona lokatsiyasi (Xarita)' : '📍 Локация клиники (Карта)', url: MAP_URL }]
-        ]
+        inline_keyboard: inlineKeyboard
       }
     });
 

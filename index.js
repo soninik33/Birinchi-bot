@@ -321,7 +321,7 @@ bot.on(['photo', 'video', 'voice', 'audio', 'document', 'sticker'], async (ctx) 
 
 // --- Server ---
 app.get('/', (req, res) => res.json({ ok: true, active: activeSpecialistChats.size }));
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));
 
 // --- Launch ---
 bot.catch((err) => console.error('❌ Bot Error:', err));

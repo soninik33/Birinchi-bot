@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: medbot-server
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: OWNER_USER_ID
+        sync: false
+      - key: SUPPORT_CHAT_ID
+        sync: false

@@ -17,6 +17,7 @@ const {
   getMessagePreview,
   extractChatIdFromSupportMessage
 } = require('../utils/helpers');
+const { MAP_URL } = require('../utils/receipt');
 
 class BotHandlers {
   constructor(bot, config, activeSpecialistChats, pendingBookings, supportMessageTargets, persistConfig) {
@@ -65,7 +66,6 @@ class BotHandlers {
 
   async createBooking(ctx) {
     const lang = this.getLang(ctx);
-    const t = TEXTS[lang] || TEXTS.uz;
     const draft = this.pendingBookings.get(ctx.chat.id);
     if (!draft || !draft.doctorKey || !draft.slot) return;
 
@@ -111,8 +111,61 @@ class BotHandlers {
       });
     }
 
-    const docName = (DOCTOR_DATA[booking.doctorKey][lang] || DOCTOR_DATA[booking.doctorKey].uz).name;
-    await ctx.replyWithHTML(t.bookingCreated(docName, booking.slot), getMainKeyboard(lang));
+    const docData = (DOCTOR_DATA[booking.doctorKey][lang] || DOCTOR_DATA[booking.doctorKey].uz);
+    const docName = docData.name;
+    const docTitle = docData.title || '';
+
+    const baseUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://birinchi-bot.onrender.com';
+    const receiptUrl = `${baseUrl.replace(/\/$/, '')}/receipt/${booking.id}`;
+
+    const receiptMsg = lang === 'uz' ? [
+      '✅ <b>Qabulga yozilish muvaffaqiyatli rasmiylashtirildi!</b>',
+      '',
+      '🧾 <b>QABUL ELEKTRON CHEKI</b>',
+      '━━━━━━━━━━━━━━━━━━━━',
+      `🆔 <b>Chek raqami:</b> <code>#${booking.id}</code>`,
+      `👤 <b>Bemor (F.I.Sh):</b> <b>${booking.patientName}</b>`,
+      `🔢 <b>Yoshi:</b> ${booking.patientAge} yosh`,
+      `📞 <b>Telefon:</b> ${booking.phone}`,
+      `👨‍⚕️ <b>Shifokor:</b> ${docName} (${docTitle})`,
+      `🕒 <b>Qabul vaqti:</b> <b>${booking.slot}</b>`,
+      booking.complaint ? `📝 <b>Shikoyat:</b> ${booking.complaint}` : null,
+      '📍 <b>Manzil:</b> Bog\'ishamol ko\'chasi, 223-uy (SAMPI)',
+      '━━━━━━━━━━━━━━━━━━━━',
+      '🔗 <b>Sizning elektron chekingiz:</b>',
+      `👉 <a href="${receiptUrl}">${receiptUrl}</a>`,
+      '',
+      '<i>Chekni saqlash yoki qabulda ko\'rsatish uchun havolani bosing.</i>'
+    ].filter(Boolean).join('\n') : [
+      '✅ <b>Вы успешно записались на прием!</b>',
+      '',
+      '🧾 <b>ЭЛЕКТРОННЫЙ ЧЕК ЗАПИСИ</b>',
+      '━━━━━━━━━━━━━━━━━━━━',
+      `🆔 <b>Номер чека:</b> <code>#${booking.id}</code>`,
+      `👤 <b>Пациент (Ф.И.О):</b> <b>${booking.patientName}</b>`,
+      `🔢 <b>Возраст:</b> ${booking.patientAge} лет`,
+      `📞 <b>Телефон:</b> ${booking.phone}`,
+      `👨‍⚕️ <b>Врач:</b> ${docName} (${docTitle})`,
+      `🕒 <b>Время приема:</b> <b>${booking.slot}</b>`,
+      booking.complaint ? `📝 <b>Жалоба:</b> ${booking.complaint}` : null,
+      '📍 <b>Адрес:</b> ул. Богишамол, 223 (САМПИ)',
+      '━━━━━━━━━━━━━━━━━━━━',
+      '🔗 <b>Ссылка на электронный чек:</b>',
+      `👉 <a href="${receiptUrl}">${receiptUrl}</a>`,
+      '',
+      '<i>Нажмите на ссылку, чтобы открыть или распечатать чек.</i>'
+    ].filter(Boolean).join('\n');
+
+    await ctx.replyWithHTML(receiptMsg, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: lang === 'uz' ? '🧾 Elektron chekni ochish' : '🧾 Открыть электронный чек', url: receiptUrl }],
+          [{ text: lang === 'uz' ? '📍 Shifoxona lokatsiyasi (Xarita)' : '📍 Локация клиники (Карта)', url: MAP_URL }]
+        ]
+      }
+    });
+
+    await ctx.reply(lang === 'uz' ? 'Asosiy menyu:' : 'Главное меню:', getMainKeyboard(lang));
   }
 
   async forwardToSupport(ctx, activeChat) {

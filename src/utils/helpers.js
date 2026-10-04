@@ -59,15 +59,21 @@ function buildDoctorCard(doctor, doctorKey, doctorSchedules, lang = 'uz') {
 
 function buildBookingSupportText(booking, lang = 'uz') {
   const doctor = DOCTOR_DATA[booking.doctorKey][lang] || DOCTOR_DATA[booking.doctorKey].uz;
+  const baseUrl = process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || 'https://birinchi-bot.onrender.com';
+  const receiptUrl = `${baseUrl.replace(/\/$/, '')}/receipt/${booking.id}`;
+
   return [
     '🆕 <b>Yangi bron so\'rovi / Новый запрос</b>',
     '',
+    `<b>🆔 Chek ID:</b> <code>#${booking.id}</code>`,
     `<b>👨‍⚕️ Mutaxassis:</b> ${doctor.name}`,
     `<b>🕒 Slot:</b> ${booking.slot}`,
-    `<b>👤 Bemor:</b> ${booking.patientName}`,
+    `<b>👤 Bemor (Ism-Familiya):</b> ${booking.patientName}`,
     `<b>🔢 Yoshi:</b> ${booking.patientAge}`,
     `<b>📞 Telefon:</b> ${booking.phone}`,
     `<b>📝 Muammo:</b> ${booking.complaint}`,
+    '',
+    `<b>🔗 Elektron chek:</b> <a href="${receiptUrl}">Chekni ko'rish (Web)</a>`,
     '',
     `<b>👤 Kimdan:</b> ${booking.userFullName}`,
     `<b>🆔 User ID:</b> <code>${booking.userId}</code>`,

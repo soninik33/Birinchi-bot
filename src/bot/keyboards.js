@@ -78,7 +78,7 @@ function getBookingSlotButtons(doctorKey, doctorSchedules, lang = 'uz') {
 function getLocationKeyboard(lang = 'uz') {
   const t = require('../constants/texts')[lang] || require('../constants/texts').uz;
   return Markup.inlineKeyboard([
-    [{ text: t.openMap, url: 'https://www.google.com/maps/search/?api=1&query=Tashkent+Pediatric+Medical+Institute+Bogishamol+Street+223+Tashkent+Uzbekistan' }]
+    [{ text: t.openMap, url: 'https://maps.app.goo.gl/RNXcPe8LbMMAGgXB7' }]
   ]);
 }
 

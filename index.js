@@ -20,6 +20,7 @@ const {
   buildDoctorCard,
   getUserFullName
 } = require('./src/utils/helpers');
+const { renderReceiptHtml, renderNotFoundHtml, MAP_URL } = require('./src/utils/receipt');
 
 // Keyboards
 const {
@@ -330,6 +331,23 @@ bot.on(['photo', 'video', 'voice', 'audio', 'document', 'sticker'], async (ctx) 
 // --- Server ---
 app.get('/', (req, res) => res.json({ ok: true, status: 'running', activeChats: activeSpecialistChats.size }));
 app.get('/health', (req, res) => res.status(200).send('OK'));
+
+app.get(['/receipt/:id', '/check/:id'], (req, res) => {
+  const bookingId = req.params.id;
+  const currentConfig = loadConfig();
+  const allBookings = [
+    ...(config.bookings || []),
+    ...(currentConfig.bookings || [])
+  ];
+  const booking = allBookings.find((b) => b.id === bookingId);
+
+  if (!booking) {
+    return res.status(404).send(renderNotFoundHtml(bookingId));
+  }
+
+  const doctor = DOCTOR_DATA[booking.doctorKey] || {};
+  res.send(renderReceiptHtml(booking, doctor));
+});
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
